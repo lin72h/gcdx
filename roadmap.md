@@ -161,6 +161,26 @@ This roadmap is guided by the current project intent:
 - `done` the C dispatch lane now has an `executor-after-settled` control and
   one prior `executor-after` timeout has identified delayed work on
   executor-style queues as the strongest current non-Swift implementation lead
+- `done` host-side symbol inspection now shows the stock Swift 6.3
+  `libdispatch.so` does not reference `_pthread_workqueue_*` while the staged
+  custom `libdispatch.so` does
+- `done` the stock-dispatch plus custom-`libthr` delayed-child Swift control
+  now has zero `kern.twq.reqthreads_count` and `kern.twq.thread_enter_count`
+  deltas across the probe window, so it is a runtime control lane rather than
+  a TWQ-backed control lane
+- `done` real Swift/TWQ validation must therefore continue to use the staged
+  custom `libdispatch` lane; the stock Swift 6.3 dispatch lane is only a
+  comparison lane
+- `done` a new pure-C `worker-after-group` dispatch probe now proves that a
+  dispatch worker can schedule delayed children and wait for them
+  successfully on the staged TWQ lane
+- `done` a new Swift `dispatchmain-taskhandles-after` probe now shows the same
+  timeout shape as `dispatchmain-taskgroup-after` on the staged TWQ lane while
+  passing on the stock host Swift 6.3 lane
+- `done` the remaining staged Swift boundary is therefore narrower than
+  generic delayed dispatch callbacks and broader than `TaskGroup` alone: it is
+  multiple delayed Swift child-task resumptions awaited by a parent async
+  context on the staged custom-`libdispatch` lane
 - `done` host-side reproduction confirmed that staged Swift binaries cannot be
   run meaningfully on the stock host kernel because the staged `libdispatch`
   intentionally traps on syscall `468`; Swift diagnosis must stay in the guest
@@ -909,18 +929,20 @@ Work:
    import uses the real TWQ-backed path;
 3. keep a host-side stock Swift 6.3 control lane so guest failures are not
    automatically misdiagnosed as generic FreeBSD Swift failures;
-4. distinguish immediate path usage from higher-level semantic mismatches:
+4. keep that stock-dispatch lane honest: it is a Swift/runtime control lane,
+   not proof that the stock toolchain dispatch is using TWQ;
+5. distinguish immediate path usage from higher-level semantic mismatches:
    a timeout with counter deltas means Swift reached TWQ but got stuck higher
    up the stack;
-5. keep the current stable Swift `validation` profile narrow and honest:
+6. keep the current stable Swift `validation` profile narrow and honest:
    - `async-smoke`
    - `dispatch-control`
    - `mainqueue-resume`
-6. use `TWQ_SWIFT_PROBE_FILTER` plus focused diagnostic probes to isolate the
+7. use `TWQ_SWIFT_PROBE_FILTER` plus focused diagnostic probes to isolate the
    remaining Swift runtime boundary in the guest without destabilizing the
    required gate;
-7. treat the broad inherited-context and detached-task families as diagnostics;
-8. only expand into broader mixed blocking, fan-out/fan-in, and QoS matrices
+8. treat the broad inherited-context and detached-task families as diagnostics;
+9. only expand into broader mixed blocking, fan-out/fan-in, and QoS matrices
    after the stable validation lane remains green while the remaining runtime
    boundary is better understood.
 
@@ -975,9 +997,26 @@ Current boundary:
     `executor-after`, and one prior `executor-after` timeout points at delayed
     work on executor-style queues as the strongest current non-Swift lead.
 16. the current staged Swift boundary is therefore best described as delayed
-    `TaskGroup` child completion on the staged custom `libdispatch` lane,
-    not generic `TaskGroup` suspension, not custom `libthr`, and not
-    `Task.sleep` alone.
+    Swift child-task completion awaited by a parent async context on the
+    staged custom `libdispatch` lane, not generic `TaskGroup` suspension,
+    not custom `libthr`, and not `Task.sleep` alone.
+17. host-side symbol inspection now shows the stock Swift 6.3
+    `libdispatch.so` does not reference `_pthread_workqueue_init`,
+    `_pthread_workqueue_addthreads`, or the other workqueue entry points,
+    while the staged custom `libdispatch.so` does.
+18. the guest-side stock-dispatch plus custom-`libthr` delayed-child control
+    completes successfully, but its `kern.twq.reqthreads_count` and
+    `kern.twq.thread_enter_count` values stay flat across the probe window.
+19. that makes the stock-dispatch plus custom-`libthr` lane a useful
+    Swift/runtime comparison lane, but not evidence that the stock Swift 6.3
+    dispatch runtime is using TWQ.
+20. a new pure-C `worker-after-group` dispatch mode completes successfully on
+    the staged TWQ lane, so raw delayed callbacks plus parent waiting do work
+    below Swift.
+21. a new Swift `dispatchmain-taskhandles-after` probe times out on the staged
+    TWQ lane while passing on the stock host Swift 6.3 lane, so the remaining
+    boundary is not `TaskGroup` alone. It is the interaction between staged
+    custom `libdispatch` and multiple delayed Swift child-task resumptions.
 
 Exit criteria:
 

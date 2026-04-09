@@ -29,6 +29,7 @@ enum dispatch_probe_mode {
 	DISPATCH_PROBE_MODE_AFTER,
 	DISPATCH_PROBE_MODE_EXECUTOR_AFTER,
 	DISPATCH_PROBE_MODE_EXECUTOR_AFTER_SETTLED,
+	DISPATCH_PROBE_MODE_WORKER_AFTER_GROUP,
 	DISPATCH_PROBE_MODE_MAIN,
 	DISPATCH_PROBE_MODE_MAIN_AFTER,
 	DISPATCH_PROBE_MODE_PRESSURE,
@@ -78,6 +79,17 @@ struct dispatch_main_probe {
 	uint32_t			delay_ms;
 	int				features;
 	bool				timed;
+};
+
+struct dispatch_after_group_probe {
+	struct dispatch_probe_state	*state;
+	const char			*mode;
+	dispatch_semaphore_t		done;
+	uint32_t			requested;
+	uint32_t			delay_ms;
+	uint32_t			timeout_ms;
+	int				features;
+	volatile int			rc;
 };
 
 static uint32_t
@@ -299,6 +311,8 @@ parse_mode_arg(const char *value)
 		return (DISPATCH_PROBE_MODE_EXECUTOR_AFTER);
 	if (strcmp(value, "executor-after-settled") == 0)
 		return (DISPATCH_PROBE_MODE_EXECUTOR_AFTER_SETTLED);
+	if (strcmp(value, "worker-after-group") == 0)
+		return (DISPATCH_PROBE_MODE_WORKER_AFTER_GROUP);
 	if (strcmp(value, "main") == 0)
 		return (DISPATCH_PROBE_MODE_MAIN);
 	if (strcmp(value, "main-after") == 0)
@@ -834,6 +848,104 @@ run_executor_after_settled_mode(struct dispatch_probe_state *state,
 	return (rc);
 }
 
+static void
+after_group_root_worker(void *ctx)
+{
+	struct dispatch_after_group_probe *probe;
+	struct dispatch_probe_state *state;
+	dispatch_group_t group;
+	dispatch_queue_t queue;
+	dispatch_time_t deadline, when;
+	uint32_t completed, main_thread_callbacks, max_inflight, started;
+	uint32_t unique_threads;
+	int i, rc, wait_rc;
+	bool timed_out;
+
+	probe = ctx;
+	state = probe->state;
+	record_common(state);
+	group = dispatch_group_create();
+	queue = dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0);
+	when = dispatch_time(DISPATCH_TIME_NOW,
+	    (int64_t)probe->delay_ms * 1000000LL);
+	deadline = dispatch_time(DISPATCH_TIME_NOW,
+	    (int64_t)probe->timeout_ms * 1000000LL);
+
+	state->group = group;
+	for (i = 0; i < (int)probe->requested; i++) {
+		dispatch_group_enter(group);
+		dispatch_after_f(when, queue, state, after_worker);
+	}
+
+	wait_rc = dispatch_group_wait(group, deadline);
+	timed_out = (wait_rc != 0);
+	started = __atomic_load_n(&state->started, __ATOMIC_SEQ_CST);
+	completed = __atomic_load_n(&state->completed, __ATOMIC_SEQ_CST);
+	max_inflight = __atomic_load_n(&state->max_inflight, __ATOMIC_SEQ_CST);
+	main_thread_callbacks = __atomic_load_n(&state->main_thread_callbacks,
+	    __ATOMIC_SEQ_CST);
+	unique_threads = unique_thread_count(state);
+	rc = (!timed_out && completed == probe->requested) ? 0 : wait_rc;
+
+	emit_after_result(
+	    probe->mode,
+	    (!timed_out && completed == probe->requested) ? "ok" : "error",
+	    rc, probe->requested, probe->delay_ms, started, completed,
+	    unique_threads, max_inflight, main_thread_callbacks, timed_out,
+	    probe->features);
+
+	state->group = NULL;
+	dispatch_release(group);
+	__atomic_store_n(&probe->rc,
+	    (!timed_out && completed == probe->requested) ? 0 : 1,
+	    __ATOMIC_SEQ_CST);
+	dispatch_semaphore_signal(probe->done);
+}
+
+static int
+run_worker_after_group_mode(struct dispatch_probe_state *state,
+    uint32_t requested, uint32_t delay_ms, uint32_t timeout_ms, int features)
+{
+	struct dispatch_after_group_probe probe;
+	dispatch_time_t deadline;
+	dispatch_queue_t queue;
+	uint32_t completed, main_thread_callbacks, max_inflight, started;
+	uint32_t unique_threads;
+	int wait_rc;
+
+	memset(&probe, 0, sizeof(probe));
+	probe.state = state;
+	probe.mode = "worker-after-group";
+	probe.requested = requested;
+	probe.delay_ms = delay_ms;
+	probe.timeout_ms = timeout_ms;
+	probe.features = features;
+	probe.done = dispatch_semaphore_create(0);
+	queue = dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0);
+	dispatch_async_f(queue, &probe, after_group_root_worker);
+
+	deadline = dispatch_time(DISPATCH_TIME_NOW,
+	    (int64_t)(timeout_ms + delay_ms + 1000U) * 1000000LL);
+	wait_rc = dispatch_semaphore_wait(probe.done, deadline);
+	if (wait_rc != 0) {
+		started = __atomic_load_n(&state->started, __ATOMIC_SEQ_CST);
+		completed = __atomic_load_n(&state->completed, __ATOMIC_SEQ_CST);
+		max_inflight = __atomic_load_n(&state->max_inflight,
+		    __ATOMIC_SEQ_CST);
+		main_thread_callbacks = __atomic_load_n(
+		    &state->main_thread_callbacks, __ATOMIC_SEQ_CST);
+		unique_threads = unique_thread_count(state);
+		emit_after_result("worker-after-group", "error", wait_rc, requested,
+		    delay_ms, started, completed, unique_threads, max_inflight,
+		    main_thread_callbacks, true, features);
+		dispatch_release(probe.done);
+		return (1);
+	}
+
+	dispatch_release(probe.done);
+	return (__atomic_load_n(&probe.rc, __ATOMIC_SEQ_CST));
+}
+
 static int
 run_main_mode_with_queue(const char *mode, struct dispatch_probe_state *state,
     dispatch_queue_t queue, uint32_t requested, uint32_t delay_ms,
@@ -1364,6 +1476,10 @@ main(int argc, char **argv)
 		break;
 	case DISPATCH_PROBE_MODE_EXECUTOR_AFTER_SETTLED:
 		rc = run_executor_after_settled_mode(&state, requested, sleep_ms,
+		    timeout_ms, features);
+		break;
+	case DISPATCH_PROBE_MODE_WORKER_AFTER_GROUP:
+		rc = run_worker_after_group_mode(&state, requested, sleep_ms,
 		    timeout_ms, features);
 		break;
 	case DISPATCH_PROBE_MODE_MAIN:

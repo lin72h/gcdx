@@ -102,6 +102,7 @@ swift_dispatchmain_continuation_bin=${TWQ_SWIFT_DISPATCHMAIN_CONTINUATION_BIN:-$
 swift_dispatchmain_sleep_bin=${TWQ_SWIFT_DISPATCHMAIN_SLEEP_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-dispatchmain-sleep}
 swift_dispatchmain_taskgroup_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-dispatchmain-taskgroup}
 swift_dispatchmain_taskgroup_after_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_AFTER_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-dispatchmain-taskgroup-after}
+swift_dispatchmain_taskhandles_after_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKHANDLES_AFTER_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-dispatchmain-taskhandles-after}
 swift_dispatchmain_taskgroup_yield_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_YIELD_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-dispatchmain-taskgroup-yield}
 swift_dispatchmain_taskgroup_onesleep_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_ONESLEEP_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-dispatchmain-taskgroup-onesleep}
 swift_dispatchmain_taskgroup_sleep_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_SLEEP_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-dispatchmain-taskgroup-sleep}
@@ -172,6 +173,7 @@ copy Swift dispatchMain continuation probe ${swift_dispatchmain_continuation_bin
 copy Swift dispatchMain sleep probe ${swift_dispatchmain_sleep_bin} into guest
 copy Swift dispatchMain TaskGroup probe ${swift_dispatchmain_taskgroup_bin} into guest
 copy Swift dispatchMain TaskGroup after probe ${swift_dispatchmain_taskgroup_after_bin} into guest
+copy Swift dispatchMain Task-handles after probe ${swift_dispatchmain_taskhandles_after_bin} into guest
 copy Swift dispatchMain TaskGroup yield probe ${swift_dispatchmain_taskgroup_yield_bin} into guest
 copy Swift dispatchMain TaskGroup one-sleep probe ${swift_dispatchmain_taskgroup_onesleep_bin} into guest
 copy Swift dispatchMain TaskGroup sleep probe ${swift_dispatchmain_taskgroup_sleep_bin} into guest
@@ -302,6 +304,11 @@ fi
 
 if [ ! -x "$swift_dispatchmain_taskgroup_after_bin" ]; then
   echo "Swift dispatchMain TaskGroup after probe binary not found or not executable: $swift_dispatchmain_taskgroup_after_bin" >&2
+  exit 66
+fi
+
+if [ ! -x "$swift_dispatchmain_taskhandles_after_bin" ]; then
+  echo "Swift dispatchMain Task-handles after probe binary not found or not executable: $swift_dispatchmain_taskhandles_after_bin" >&2
   exit 66
 fi
 
@@ -454,6 +461,7 @@ doas install -m 755 "$swift_dispatchmain_continuation_bin" "$guest_root/root/twq
 doas install -m 755 "$swift_dispatchmain_sleep_bin" "$guest_root/root/twq-swift-dispatchmain-sleep"
 doas install -m 755 "$swift_dispatchmain_taskgroup_bin" "$guest_root/root/twq-swift-dispatchmain-taskgroup"
 doas install -m 755 "$swift_dispatchmain_taskgroup_after_bin" "$guest_root/root/twq-swift-dispatchmain-taskgroup-after"
+doas install -m 755 "$swift_dispatchmain_taskhandles_after_bin" "$guest_root/root/twq-swift-dispatchmain-taskhandles-after"
 doas install -m 755 "$swift_dispatchmain_taskgroup_yield_bin" "$guest_root/root/twq-swift-dispatchmain-taskgroup-yield"
 doas install -m 755 "$swift_dispatchmain_taskgroup_onesleep_bin" "$guest_root/root/twq-swift-dispatchmain-taskgroup-onesleep"
 doas install -m 755 "$swift_dispatchmain_taskgroup_sleep_bin" "$guest_root/root/twq-swift-dispatchmain-taskgroup-sleep"
@@ -901,6 +909,29 @@ log=/var/log/twq-probe.log
   echo "=== twq dispatch executor-after-settled stats after end ==="
   if [ "${dispatch_executor_after_settled_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
     probe_failure_rc=${dispatch_executor_after_settled_rc}
+  fi
+  if swift_run_full_unfiltered_diagnostics; then
+  echo "=== twq dispatch worker-after-group stats before ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq dispatch worker-after-group stats before end ==="
+  echo "=== twq dispatch worker-after-group probe start ==="
+  dispatch_worker_after_group_rc=0
+  env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode worker-after-group --tasks 8 --sleep-ms 40 --timeout-ms 5000 || dispatch_worker_after_group_rc=$?
+  echo "=== twq dispatch worker-after-group probe end ==="
+  echo "=== twq dispatch worker-after-group stats after ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq dispatch worker-after-group stats after end ==="
+  if [ "${dispatch_worker_after_group_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+    probe_failure_rc=${dispatch_worker_after_group_rc}
+  fi
   fi
   echo "=== twq dispatch main stats before ==="
   sysctl kern.twq.init_count \
@@ -1837,6 +1868,26 @@ log=/var/log/twq-probe.log
     probe_failure_rc=${swift_dispatchmain_taskgroup_sleep_stockdispatch_customthr_rc}
   fi
   fi
+  if swift_probe_should_run "dispatchmain-taskhandles-after" diagnostic; then
+  echo "=== twq swift dispatchmain taskhandles after probe start ==="
+  swift_dispatchmain_taskhandles_after_rc=0
+  RUN_WITH_TIMEOUT_LABEL=dispatchmain-taskhandles-after
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=1
+  run_with_timeout 15 env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-swift/usr/lib/swift/freebsd:/root/twq-lib /root/twq-swift-dispatchmain-taskhandles-after
+  RUN_WITH_TIMEOUT_LABEL=
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=0
+  swift_dispatchmain_taskhandles_after_rc=${RUN_WITH_TIMEOUT_STATUS}
+  if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
+    echo '{"kind":"swift-probe","status":"timeout","data":{"mode":"dispatchmain-taskhandles-after","timed_out":true,"timeout_sec":15},"meta":{"component":"swift","binary":"twq-swift-dispatchmain-taskhandles-after"}}'
+    swift_dispatchmain_taskhandles_after_rc=124
+  elif [ "${swift_dispatchmain_taskhandles_after_rc}" -ne 0 ]; then
+    echo "{\"kind\":\"swift-probe\",\"status\":\"error\",\"data\":{\"mode\":\"dispatchmain-taskhandles-after\",\"timed_out\":false,\"rc\":${swift_dispatchmain_taskhandles_after_rc}},\"meta\":{\"component\":\"swift\",\"binary\":\"twq-swift-dispatchmain-taskhandles-after\"}}"
+  fi
+  echo "=== twq swift dispatchmain taskhandles after probe end ==="
+  if [ "${swift_dispatchmain_taskhandles_after_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+    probe_failure_rc=${swift_dispatchmain_taskhandles_after_rc}
+  fi
+  fi
   if swift_probe_should_run "dispatchmain-taskgroup-after" diagnostic; then
   echo "=== twq swift dispatchmain taskgroup after stats before ==="
   sysctl kern.twq.init_count \
@@ -1892,6 +1943,13 @@ log=/var/log/twq-probe.log
   fi
   fi
   if swift_probe_should_run "dispatchmain-taskgroup-after-stockdispatch-customthr" diagnostic; then
+  echo "=== twq swift dispatchmain taskgroup after stockdispatch customthr stats before ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq swift dispatchmain taskgroup after stockdispatch customthr stats before end ==="
   echo "=== twq swift dispatchmain taskgroup after stockdispatch customthr probe start ==="
   swift_dispatchmain_taskgroup_after_stockdispatch_customthr_rc=0
   RUN_WITH_TIMEOUT_LABEL=dispatchmain-taskgroup-after-stockdispatch-customthr
@@ -1907,6 +1965,13 @@ log=/var/log/twq-probe.log
     echo "{\"kind\":\"swift-probe\",\"status\":\"error\",\"data\":{\"mode\":\"dispatchmain-taskgroup-after-stockdispatch-customthr\",\"timed_out\":false,\"rc\":${swift_dispatchmain_taskgroup_after_stockdispatch_customthr_rc}},\"meta\":{\"component\":\"swift\",\"binary\":\"twq-swift-dispatchmain-taskgroup-after\"}}"
   fi
   echo "=== twq swift dispatchmain taskgroup after stockdispatch customthr probe end ==="
+  echo "=== twq swift dispatchmain taskgroup after stockdispatch customthr stats after ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq swift dispatchmain taskgroup after stockdispatch customthr stats after end ==="
   if [ "${swift_dispatchmain_taskgroup_after_stockdispatch_customthr_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
     probe_failure_rc=${swift_dispatchmain_taskgroup_after_stockdispatch_customthr_rc}
   fi

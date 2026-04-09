@@ -2,6 +2,36 @@
 
 ## 2026-04-10
 
+### Swift 6.3 stock-dispatch boundary corrected
+
+The repo now records an important Swift validation correction:
+
+1. the stock Swift 6.3 toolchain `libdispatch.so` does not reference
+   `_pthread_workqueue_*` symbols at all;
+2. the staged custom `libdispatch.so` does;
+3. the stock-dispatch plus custom-`libthr` guest control completes a delayed
+   child-completion probe successfully, but shows zero TWQ counter deltas
+   during that probe window.
+
+This means the stock Swift 6.3 dispatch lane is a useful runtime control, but
+it is not a TWQ-backed control lane. Real Swift/TWQ validation still depends
+on the staged custom `libdispatch` lane.
+
+### Swift delayed-child boundary narrowed again
+
+The repo now has a stronger staged Swift diagnosis:
+
+1. a new pure-C `worker-after-group` dispatch mode succeeds on the staged TWQ
+   lane;
+2. a new Swift `dispatchmain-taskhandles-after` probe still times out there,
+   while passing on the stock host Swift 6.3 lane.
+
+This means the remaining problem is no longer best described as a
+`TaskGroup`-only bug. The tighter boundary is:
+
+1. multiple delayed Swift child-task resumptions awaited by a parent async
+   context on the staged custom-`libdispatch` lane.
+
 ### Current macOS-gap reading
 
 The repo now carries an explicit estimate for how close the current port is to

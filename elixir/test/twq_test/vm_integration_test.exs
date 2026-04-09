@@ -129,6 +129,70 @@ defmodule TwqTest.VMIntegrationTest do
              section_value(swift_mainqueue_resume_before, "kern.twq.thread_enter_count")
   end
 
+  test "stock toolchain dispatch plus custom libthr completes delayed taskgroup child completion without TWQ activity" do
+    repo_root = Path.expand("../../..", __DIR__)
+    temp_root = System.tmp_dir!()
+    vm_name = "twq-dev"
+    vm_image = Path.expand("../vm/runs/#{vm_name}.img", repo_root)
+    serial_log = Path.join(temp_root, "#{vm_name}.integration.serial.log")
+    guest_root = Path.join(temp_root, "#{vm_name}.integration.root")
+    custom_dispatch = Path.expand("../artifacts/libdispatch-stage/libdispatch.so", repo_root)
+    stock_dispatch = Path.expand("../artifacts/swift-stock-dispatch-stage/libdispatch.so", repo_root)
+
+    custom_symbols = dispatch_dynamic_symbols(custom_dispatch)
+    stock_symbols = dispatch_dynamic_symbols(stock_dispatch)
+
+    result =
+      VM.probe_guest(
+        vm_name: vm_name,
+        vm_image: vm_image,
+        serial_log: serial_log,
+        guest_root: guest_root,
+        command_timeout_ms: 300_000,
+        swift_probe_profile: "full",
+        swift_probe_filter: "dispatchmain-taskgroup-after-stockdispatch-customthr",
+        validate_serial: false
+      )
+
+    assert custom_symbols =~ "_pthread_workqueue_init"
+    assert custom_symbols =~ "_pthread_workqueue_addthreads"
+    refute stock_symbols =~ "_pthread_workqueue_init"
+    refute stock_symbols =~ "_pthread_workqueue_addthreads"
+
+    swift_probe_lines =
+      result.data[:serial_log]
+      |> String.split("\n", trim: true)
+      |> Enum.filter(&String.contains?(&1, "\"kind\":\"swift-probe\""))
+
+    taskgroup_after_line =
+      dispatch_line_for_mode(swift_probe_lines, "\"mode\":\"dispatchmain-taskgroup-after\"")
+
+    taskgroup_before =
+      section_between(
+        result.data[:serial_log],
+        "=== twq swift dispatchmain taskgroup after stockdispatch customthr stats before ===",
+        "=== twq swift dispatchmain taskgroup after stockdispatch customthr stats before end ==="
+      )
+
+    taskgroup_after =
+      section_between(
+        result.data[:serial_log],
+        "=== twq swift dispatchmain taskgroup after stockdispatch customthr stats after ===",
+        "=== twq swift dispatchmain taskgroup after stockdispatch customthr stats after end ==="
+      )
+
+    assert result.status == :ok
+    assert String.contains?(taskgroup_after_line, "\"status\":\"ok\"")
+    assert String.contains?(taskgroup_after_line, "\"completed\":8")
+    assert String.contains?(taskgroup_after_line, "\"sum\":28")
+
+    assert section_value(taskgroup_after, "kern.twq.reqthreads_count") ==
+             section_value(taskgroup_before, "kern.twq.reqthreads_count")
+
+    assert section_value(taskgroup_after, "kern.twq.thread_enter_count") ==
+             section_value(taskgroup_before, "kern.twq.thread_enter_count")
+  end
+
   defp line_has?(line, fragment1, fragment2, fragment3) do
     String.contains?(line, fragment1) and
       String.contains?(line, fragment2) and
@@ -167,5 +231,10 @@ defmodule TwqTest.VMIntegrationTest do
       [_, value] -> String.to_integer(value)
       _ -> -1
     end
+  end
+
+  defp dispatch_dynamic_symbols(path) do
+    {output, 0} = System.cmd("nm", ["-D", path], stderr_to_stdout: true)
+    output
   end
 end

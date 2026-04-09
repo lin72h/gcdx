@@ -39,6 +39,7 @@ defmodule TwqTest.VM do
   @spec probe_guest(keyword()) :: Result.t()
   def probe_guest(opts \\ []) do
     env = build_env(opts)
+    validate_serial? = Keyword.get(opts, :validate_serial, true)
     File.rm(env.serial_log)
     build_result = Zig.build(opts)
     workqueue_build_result = Zig.build_workqueue_probe(opts)
@@ -132,7 +133,7 @@ defmodule TwqTest.VM do
             swift_probe_profile = swift_probe_profile(serial_log)
             swift_timeout_modes = swift_timeout_modes(serial_log)
             validation_failures = probe_validation_failures(serial_log)
-            serial_ok? = validation_failures == []
+            serial_ok? = not validate_serial? or validation_failures == []
             exit_ok? = run_result.exit_status in @normal_bhyve_exit_statuses and not run_result.timed_out?
 
             payload = %{

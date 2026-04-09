@@ -55,6 +55,45 @@ if [ ! -f "$pthread_headers_dir/pthread/workqueue_private.h" ]; then
   exit 66
 fi
 
+normalize_config_ac() {
+  config_ac=$1
+  tmp=
+
+  if [ ! -f "$config_ac" ]; then
+    return 0
+  fi
+
+  tmp="${config_ac}.tmp"
+  awk '
+    /^#define HAVE_PTHREAD_QOS_H$/ {
+      print "#define HAVE_PTHREAD_QOS_H 1"
+      next
+    }
+    /^#define HAVE_PTHREAD_WORKQUEUE_H$/ {
+      print "#define HAVE_PTHREAD_WORKQUEUE_H 1"
+      next
+    }
+    /^#define HAVE_PTHREAD_WORKQUEUE_PRIVATE_H$/ {
+      print "#define HAVE_PTHREAD_WORKQUEUE_PRIVATE_H 1"
+      next
+    }
+    /^#define HAVE__PTHREAD_WORKQUEUE_INIT$/ {
+      print "#define HAVE__PTHREAD_WORKQUEUE_INIT 1"
+      next
+    }
+    { print }
+  ' "$config_ac" > "$tmp"
+  mv "$tmp" "$config_ac"
+}
+
+if [ -f "$dispatch_build_dir/CMakeCache.txt" ]; then
+  cached_src=$(sed -n 's/^CMAKE_HOME_DIRECTORY:INTERNAL=//p' \
+    "$dispatch_build_dir/CMakeCache.txt")
+  if [ -n "$cached_src" ] && [ "$cached_src" != "$dispatch_src" ]; then
+    rm -rf "$dispatch_build_dir" "$dispatch_prefix"
+  fi
+fi
+
 mkdir -p "$dispatch_build_dir" "$dispatch_prefix" "$dispatch_stage_dir"
 
 cmake -S "$dispatch_src" -B "$dispatch_build_dir" -G Ninja \
@@ -72,6 +111,8 @@ cmake -S "$dispatch_src" -B "$dispatch_build_dir" -G Ninja \
   -DHAVE_PTHREAD_WORKQUEUE_SETDISPATCH_NP:BOOL=ON \
   -DHAVE_PTHREAD_WORKQUEUE_PRIVATE_H:BOOL=ON \
   -DHAVE_PTHREAD_WORKQUEUE_H:BOOL=ON
+
+normalize_config_ac "$dispatch_build_dir/config/config_ac.h"
 
 ninja -C "$dispatch_build_dir" dispatch
 

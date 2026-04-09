@@ -28,6 +28,7 @@ Environment:
   TWQ_SWIFT_DISPATCHMAIN_SLEEP_BIN Output binary for the Swift dispatchMain sleep probe
   TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_BIN Output binary for the Swift dispatchMain TaskGroup probe
   TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_AFTER_BIN Output binary for the Swift dispatchMain TaskGroup after probe
+  TWQ_SWIFT_DISPATCHMAIN_TASKHANDLES_AFTER_BIN Output binary for the Swift dispatchMain Task-handles after probe
   TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_YIELD_BIN Output binary for the Swift dispatchMain TaskGroup yield probe
   TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_ONESLEEP_BIN Output binary for the Swift dispatchMain TaskGroup one-sleep probe
   TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_SLEEP_BIN Output binary for the Swift dispatchMain TaskGroup sleep probe
@@ -85,6 +86,7 @@ dispatchmain_continuation_bin=${TWQ_SWIFT_DISPATCHMAIN_CONTINUATION_BIN:-${artif
 dispatchmain_sleep_bin=${TWQ_SWIFT_DISPATCHMAIN_SLEEP_BIN:-${artifacts_root}/swift/bin/twq-swift-dispatchmain-sleep}
 dispatchmain_taskgroup_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_BIN:-${artifacts_root}/swift/bin/twq-swift-dispatchmain-taskgroup}
 dispatchmain_taskgroup_after_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_AFTER_BIN:-${artifacts_root}/swift/bin/twq-swift-dispatchmain-taskgroup-after}
+dispatchmain_taskhandles_after_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKHANDLES_AFTER_BIN:-${artifacts_root}/swift/bin/twq-swift-dispatchmain-taskhandles-after}
 dispatchmain_taskgroup_yield_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_YIELD_BIN:-${artifacts_root}/swift/bin/twq-swift-dispatchmain-taskgroup-yield}
 dispatchmain_taskgroup_onesleep_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_ONESLEEP_BIN:-${artifacts_root}/swift/bin/twq-swift-dispatchmain-taskgroup-onesleep}
 dispatchmain_taskgroup_sleep_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_SLEEP_BIN:-${artifacts_root}/swift/bin/twq-swift-dispatchmain-taskgroup-sleep}
@@ -118,6 +120,7 @@ dispatchmain_continuation_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_conti
 dispatchmain_sleep_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_sleep.swift
 dispatchmain_taskgroup_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_taskgroup.swift
 dispatchmain_taskgroup_after_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_taskgroup_after.swift
+dispatchmain_taskhandles_after_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_taskhandles_after.swift
 dispatchmain_taskgroup_yield_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_taskgroup_yield.swift
 dispatchmain_taskgroup_onesleep_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_taskgroup_onesleep.swift
 dispatchmain_taskgroup_sleep_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_taskgroup_sleep.swift
@@ -163,7 +166,7 @@ mkdir -p "$(dirname "$async_smoke_bin")" "$(dirname "$async_yield_bin")" "$(dirn
   "$(dirname "$dispatchmain_spawnwait_yield_bin")" "$(dirname "$dispatchmain_spawnwait_sleep_bin")" "$(dirname "$dispatchmain_spawnwait_after_bin")" \
   "$(dirname "$dispatchmain_spawned_yield_bin")" "$(dirname "$dispatchmain_spawned_sleep_bin")" \
   "$(dirname "$dispatchmain_yield_bin")" "$(dirname "$dispatchmain_continuation_bin")" "$(dirname "$dispatchmain_sleep_bin")" \
-  "$(dirname "$dispatchmain_taskgroup_bin")" "$(dirname "$dispatchmain_taskgroup_after_bin")" "$(dirname "$dispatchmain_taskgroup_yield_bin")" "$(dirname "$dispatchmain_taskgroup_onesleep_bin")" \
+  "$(dirname "$dispatchmain_taskgroup_bin")" "$(dirname "$dispatchmain_taskgroup_after_bin")" "$(dirname "$dispatchmain_taskhandles_after_bin")" "$(dirname "$dispatchmain_taskgroup_yield_bin")" "$(dirname "$dispatchmain_taskgroup_onesleep_bin")" \
   "$(dirname "$dispatchmain_taskgroup_sleep_bin")" "$(dirname "$dispatchmain_taskgroup_sleep_next_bin")" "$(dirname "$detached_sleep_bin")" \
   "$(dirname "$detached_taskgroup_bin")" "$(dirname "$continuation_resume_bin")" \
   "$(dirname "$spawned_continuation_bin")" "$(dirname "$spawned_yield_bin")" "$(dirname "$spawned_sleep_bin")" "$(dirname "$task_spawn_bin")" \
@@ -297,6 +300,13 @@ cp -a "$swift_usr_root/lib/swift/freebsd/libBlocksRuntime.so" "$swift_stock_disp
   -Xlinker -rpath -Xlinker "$guest_rpath" \
   "$dispatchmain_taskgroup_after_src" \
   -o "$dispatchmain_taskgroup_after_bin"
+
+"$swiftc_bin" \
+  -parse-as-library \
+  -no-toolchain-stdlib-rpath \
+  -Xlinker -rpath -Xlinker "$guest_rpath" \
+  "$dispatchmain_taskhandles_after_src" \
+  -o "$dispatchmain_taskhandles_after_bin"
 
 "$swiftc_bin" \
   -parse-as-library \
