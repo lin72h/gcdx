@@ -1,0 +1,74 @@
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Temporary / patch leftovers
+*.tmp
+*.temp
+*.orig
+*.rej
+
+# Logs and crash artifacts
+*.log
+*.core
+core
+erl_crash.dump
+crash/
+kdump/
+
+# Build outputs and binaries
+build/
+.build/
+Build/
+out/
+obj/
+bin/
+dist/
+stage/
+tmp/
+*.o
+*.lo
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.ko
+*.profraw
+*.profdata
+*.gcno
+*.gcda
+
+# VM and disk images
+vm/
+*.img
+*.iso
+*.qcow2
+*.vhd
+*.vmdk
+
+# macOS debug bundles
+*.dSYM/
+
+# Local analysis artifacts
+artifacts/
+logs/
+serial/
+compile_commands.json
+
+# Elixir build state
+elixir/_build/
+elixir/deps/
+elixir/.elixir_ls/
+
+# SwiftPM / Swift local state
+.swiftpm/
+
+# Zig build state
+zig/.zig-cache/
+zig/zig-out/

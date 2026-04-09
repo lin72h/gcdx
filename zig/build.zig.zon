@@ -1,0 +1,15 @@
+.{
+    .name = .twq_test,
+    .version = "0.1.0",
+    .fingerprint = 0xe7f189c8487f6d67,
+    .minimum_zig_version = "0.15.2",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "README.md",
+        "src",
+        "test",
+        "bench",
+    },
+}
