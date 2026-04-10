@@ -1,4 +1,4 @@
-# pthread_workqueue Port Plan for FreeBSD 15
+# GCDX `pthread_workqueue` Port Plan for FreeBSD 15
 
 ## Status
 
@@ -6,6 +6,10 @@ This document is a strategy and implementation plan, not an implementation.
 It is written for the local trees currently available under `../nx/`.
 The concrete target FreeBSD tree is now confirmed at `/usr/src`, and the local
 ports tree is confirmed at `/usr/ports`.
+
+Project name:
+
+1. this implementation effort is now named `GCDX`.
 
 ## Objective
 

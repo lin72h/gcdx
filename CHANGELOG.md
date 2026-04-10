@@ -1,6 +1,17 @@
-# Changelog
+# CHANGELOG
 
 ## 2026-04-10
+
+### Project naming standardized
+
+The repo now treats `GCDX` as the explicit project name for the current
+FreeBSD-based kernel-integrated dispatch effort.
+
+The terminology map is now:
+
+1. `libdispatch` = portable Tier 0 baseline;
+2. `GCDX` = this project, the kernel-integrated Tier 1 lane;
+3. `GCD` = the platform-complete macOS reference lane.
 
 ### Swift 6.3 stock-dispatch boundary corrected
 

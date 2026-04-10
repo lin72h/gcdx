@@ -1,9 +1,9 @@
-# pthread_workqueue Testing Strategy
+# GCDX `pthread_workqueue` Testing Strategy
 
 ## Status
 
 This document defines the testing architecture for the FreeBSD 15
-`pthread_workqueue` effort.
+`pthread_workqueue` effort that now carries the project name `GCDX`.
 
 It is intentionally separate from the main implementation plan because testing
 is not a side concern here. The quality of this port depends on having a test

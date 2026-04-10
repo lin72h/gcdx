@@ -1,8 +1,12 @@
-# Roadmap
+# GCDX ROADMAP
 
 ## Purpose
 
 This roadmap turns the strategy documents into an execution map.
+
+Project name:
+
+1. this repo's implementation effort is named `GCDX`.
 
 It is intentionally milestone-heavy. The goal is to make progress legible,
 stage work in a sane order, and keep the project honest about what is actually

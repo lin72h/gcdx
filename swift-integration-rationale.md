@@ -1,9 +1,9 @@
-# Swift Integration Rationale
+# GCDX Swift Integration Rationale
 
 ## Purpose
 
-This note explains why recent work in this repo spends meaningful time on Swift,
-even though the core porting target is the C layer:
+This note explains why recent `GCDX` work spends meaningful time on Swift, even
+though the core porting target is the C layer:
 
 - kernel `TWQ` / `pthread_workqueue`-style support
 - `libthr` bridge
@@ -11,7 +11,7 @@ even though the core porting target is the C layer:
 
 The short answer is:
 
-> Swift is both a first-class product target of this project and the best
+> Swift is both a first-class product target of `GCDX` and the best
 > high-value test vehicle for the C stack underneath it.
 
 ## Core Position
