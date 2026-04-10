@@ -215,6 +215,13 @@ Why the first number is already fairly high:
 5. staged `libdispatch` runs on that path;
 6. Swift is already a meaningful validation lane, not just a synthetic demo.
 
+Important caveat:
+
+1. that `70-80%` reading is a mechanism-coverage estimate for the
+   kernel-backed workqueue path;
+2. it is not a claim that higher-level behavioral correctness is already close
+   to macOS while the staged delayed-child boundary remains open.
+
 Why the second number is still much lower:
 
 1. no direct kevent-workqueue delivery exists yet;
@@ -252,7 +259,7 @@ Working interpretation:
 | M11 | planned | Apple behavior reference lane | Apple `libdispatch` semantics compared against the port |
 | M11.5 | done | Sustained workload validation | Worker lifecycle and bounded warm-pool behavior hold under longer-running dispatch loads |
 | M11.6 | done | Timeout-isolation validation | Idle retirement and long-gap reuse are both proven independently of short-burst dispatch behavior |
-| M12 | next | Swift concurrency validation | Stable Swift validation profile passing; staged guest boundary narrowed to delayed `TaskGroup` child completion on custom `libdispatch` |
+| M12 | next | C-level delayed-child dispatch fix | Staged `libdispatch` executor-after / delayed-child bug isolated and fixed in the C lane, with Swift validation held steady |
 | M13 | planned | Performance and regression discipline | Zig benchmarks and stable baselines |
 | M14 | planned | Canonical macOS comparison lane | Structured FreeBSD-vs-macOS comparison |
 | M15 | later | Optional deep integration | Scheduler refinement and possible kevent/workloop decisions |
@@ -914,41 +921,44 @@ This milestone closes the exact ambiguity Opus called out. The warm pool is no
 longer just a plausible interpretation of short-burst behavior; idle
 retirement and long-gap reuse are now proven separately and reproducibly.
 
-## M12: Swift Concurrency Validation
+## M12: C-Level Delayed-Child Dispatch Fix
 
 Status: `next`
 
 Goal:
 
-1. prove the feature helps where it was intended to help;
-2. validate Swift-facing semantics under real workloads;
-3. separate "Swift uses TWQ" from "all Swift concurrency behaviors are
-   currently healthy."
+1. close the strongest remaining Tier 1 correctness gap in staged
+   `libdispatch`;
+2. shift the fix vehicle from Swift symptom hunting to C-level dispatch
+   debugging;
+3. keep the current Swift validation lane honest while the real fix target is
+   isolated and repaired.
 
 Work:
 
-1. keep the new Swift async smoke probe as the cheapest proof that the staged
-   Swift runtime can start an `async` main under `TWQDEBUG`;
-2. keep the Swift Dispatch control probe as the proof that Swift's `Dispatch`
-   import uses the real TWQ-backed path;
-3. keep a host-side stock Swift 6.3 control lane so guest failures are not
-   automatically misdiagnosed as generic FreeBSD Swift failures;
-4. keep that stock-dispatch lane honest: it is a Swift/runtime control lane,
-   not proof that the stock toolchain dispatch is using TWQ;
-5. distinguish immediate path usage from higher-level semantic mismatches:
-   a timeout with counter deltas means Swift reached TWQ but got stuck higher
-   up the stack;
-6. keep the current stable Swift `validation` profile narrow and honest:
+1. freeze expansion of the Swift probe set for this milestone;
+2. keep the current stable Swift `validation` profile narrow and honest:
    - `async-smoke`
    - `dispatch-control`
    - `mainqueue-resume`
-7. use `TWQ_SWIFT_PROBE_FILTER` plus focused diagnostic probes to isolate the
-   remaining Swift runtime boundary in the guest without destabilizing the
-   required gate;
-8. treat the broad inherited-context and detached-task families as diagnostics;
-9. only expand into broader mixed blocking, fan-out/fan-in, and QoS matrices
-   after the stable validation lane remains green while the remaining runtime
-   boundary is better understood.
+3. keep the Swift diagnostic matrix as a regression and comparison lane, not
+   as the primary fix vehicle;
+4. make `executor-after` deterministic, or replace it with an equally small
+   pure-C delayed-work reproduction if that proves stronger;
+5. instrument staged `libdispatch` around:
+   - delayed callback wakeup;
+   - executor-style queue wakeup;
+   - `_dispatch_root_queue_poke_slow`;
+   - worker-request issuance and pending state transitions;
+6. compare stock dispatch against staged `GCDX` dispatch for the same
+   executor-style delayed-work pattern;
+7. determine whether staged `libdispatch` is:
+   - failing to request a worker;
+   - requesting too late;
+   - or mishandling resumed work on executor-style queues;
+8. fix the bug in the C dispatch layer first, then re-run the existing Swift
+   diagnostics on top of that change;
+9. defer new Swift workload families until the C-level diagnosis is resolved.
 
 Current boundary:
 
@@ -1024,19 +1034,22 @@ Current boundary:
 
 Exit criteria:
 
-1. the repo has one stable Swift validation lane that both completes and proves
-   TWQ counter movement;
-2. representative Swift workloads complete correctly on that lane;
-3. blocked-worker scenarios on that lane do not explode thread counts;
-4. inherited-context failures are either fixed or explicitly demoted to a
-   documented diagnostic boundary;
-5. the system behavior is strong enough to justify broader Swift validation.
+1. the repo has a deterministic or equivalently strong pure-C reproduction for
+   the staged executor-after / delayed-child class of failure;
+2. staged `libdispatch` instrumentation explains the divergence between stock
+   and staged delayed-work behavior;
+3. the C-level delayed-child / executor-style queue bug is fixed or reduced to
+   a tighter, documented dispatch-layer boundary;
+4. the existing required Swift `validation` profile remains green;
+5. at least one existing staged Swift delayed-child diagnostic is re-run after
+   the C-level fix and shows either resolution or a materially tighter
+   residual boundary.
 
 Why it matters:
 
-Swift concurrency is one of the main reasons this project exists, but it is
-also the first place where "dispatch path works" and "full higher-level
-semantics work" can diverge. M12 now exists to make that divergence explicit.
+The project has already used Swift correctly as the discovery lane. The next
+honest step is to fix the strongest remaining staged-dispatch correctness gap
+at Layer B instead of continuing to refine the symptom description at Layer A.
 
 ## M13: Performance and Regression Discipline
 
@@ -1171,19 +1184,20 @@ Question:
 
 The highest-value next milestones are:
 
-1. M12: isolate and fix the first structured-concurrency timeout on the real
-   TWQ-backed Swift path
+1. M12: isolate and fix the staged `libdispatch` executor-after /
+   delayed-child bug at the C level
 2. M13: start locking in performance and regression discipline once the first
-   Swift gate is healthy
+   staged-dispatch correctness gap is closed
 3. M14: use native macOS as the comparison lane after the FreeBSD Swift gate
    is trustworthy
 
 That order gives the project:
 
-1. a clear answer about whether Swift concurrency is blocked by path selection
-   or by higher-level runtime behavior;
-2. a way to prevent Swift-facing regressions from hiding behind dispatch-only
-   success;
+1. a clear answer about whether the remaining boundary belongs to staged
+   `libdispatch` worker-request behavior rather than broader Swift or kernel
+   failure;
+2. a way to keep Swift-facing regressions honest without debugging them first
+   through Swift-only symptoms;
 3. a better foundation for later macOS comparison.
 
 ## Bottom Line

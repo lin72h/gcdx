@@ -2,6 +2,20 @@
 
 ## 2026-04-10
 
+### GLM review response captured
+
+The repo now records the immediate execution response to the external GLM
+architecture review.
+
+The main change is a shift in the next-step judgment:
+
+1. the remaining staged delayed-child boundary is now treated primarily as a
+   Layer B staged-`libdispatch` correctness problem;
+2. the next milestone is no longer "more Swift narrowing";
+3. the next milestone is now a C-level staged-`libdispatch` executor-after /
+   delayed-child fix, while the current Swift probe set is held steady as a
+   validation and regression lane.
+
 ### Project naming standardized
 
 The repo now treats `GCDX` as the explicit project name for the current
