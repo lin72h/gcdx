@@ -1,0 +1,313 @@
+{
+  "baseline": "m13-initial",
+  "benchmarks": {
+    "dispatch.basic": {
+      "probe": {
+        "completed": 8,
+        "max_inflight": 4,
+        "requested": 8,
+        "unique_threads": 4
+      },
+      "status": "ok",
+      "twq_delta": {
+        "init_count": 1,
+        "reqthreads_count": 15,
+        "setup_dispatch_count": 1,
+        "thread_enter_count": 5
+      }
+    },
+    "dispatch.burst-reuse": {
+      "probe": {
+        "max_inflight": 4,
+        "requested": 24,
+        "round_new_threads": [
+          4,
+          0,
+          0,
+          0
+        ],
+        "round_reqthreads_delta": [
+          17,
+          17,
+          17,
+          17
+        ],
+        "round_thread_enter_delta": [
+          5,
+          5,
+          5,
+          5
+        ],
+        "rounds": 4,
+        "rounds_completed": 4,
+        "settled_active": 0,
+        "settled_idle": 4,
+        "settled_total": 4,
+        "unique_threads": 4,
+        "warm_floor": 4
+      },
+      "status": "ok",
+      "twq_delta": {
+        "bucket_admit_total": [
+          0,
+          0,
+          0,
+          8,
+          0,
+          0
+        ],
+        "bucket_req_total": [
+          0,
+          0,
+          0,
+          196,
+          0,
+          0
+        ],
+        "init_count": 1,
+        "reqthreads_count": 68,
+        "setup_dispatch_count": 1,
+        "should_narrow_true_count": 0,
+        "thread_enter_count": 20,
+        "thread_return_count": 20
+      }
+    },
+    "dispatch.main-executor-resume-repeat": {
+      "probe": {
+        "completed_rounds": 64,
+        "delay_ms": 20,
+        "expected_total_sum": 1792,
+        "max_inflight": 2,
+        "rounds": 64,
+        "tasks": 8,
+        "total_sum": 1792,
+        "unique_threads": 4
+      },
+      "status": "ok",
+      "twq_delta": {
+        "init_count": 1,
+        "reqthreads_count": 564,
+        "setup_dispatch_count": 1,
+        "thread_enter_count": 189,
+        "thread_return_count": 186
+      }
+    },
+    "dispatch.pressure": {
+      "probe": {
+        "completed_default": 8,
+        "completed_high": 1,
+        "default_max_inflight": 3,
+        "requested_default": 8,
+        "requested_high": 1,
+        "unique_threads": 4
+      },
+      "status": "ok",
+      "twq_delta": {
+        "bucket_admit_total": [
+          0,
+          0,
+          0,
+          6,
+          0,
+          2
+        ],
+        "bucket_req_total": [
+          0,
+          0,
+          0,
+          25,
+          0,
+          2
+        ],
+        "bucket_switch_block_total": [
+          0,
+          0,
+          0,
+          8,
+          0,
+          1
+        ],
+        "bucket_switch_unblock_total": [
+          0,
+          0,
+          0,
+          8,
+          0,
+          1
+        ],
+        "init_count": 1,
+        "reqthreads_count": 15,
+        "setup_dispatch_count": 1,
+        "switch_block_count": 9,
+        "switch_unblock_count": 9,
+        "thread_enter_count": 5
+      }
+    },
+    "dispatch.sustained": {
+      "probe": {
+        "completed_default": 640,
+        "completed_high": 1,
+        "default_max_inflight": 5,
+        "peak_sample_active": 0,
+        "peak_sample_idle": 5,
+        "peak_sample_total": 5,
+        "requested_default": 640,
+        "requested_high": 1,
+        "sample_count": 55,
+        "settled_active": 0,
+        "settled_idle": 4,
+        "settled_total": 4,
+        "unique_threads": 5,
+        "warm_floor": 4
+      },
+      "status": "ok",
+      "twq_delta": {
+        "bucket_admit_total": [
+          0,
+          0,
+          0,
+          8,
+          0,
+          2
+        ],
+        "bucket_req_total": [
+          0,
+          0,
+          0,
+          371,
+          0,
+          2
+        ],
+        "bucket_switch_block_total": [
+          0,
+          0,
+          0,
+          640,
+          0,
+          1
+        ],
+        "bucket_switch_unblock_total": [
+          0,
+          0,
+          0,
+          640,
+          0,
+          1
+        ],
+        "init_count": 1,
+        "reqthreads_count": 74,
+        "setup_dispatch_count": 1,
+        "should_narrow_true_count": 0,
+        "switch_block_count": 641,
+        "switch_unblock_count": 641,
+        "thread_enter_count": 7,
+        "thread_return_count": 7
+      }
+    },
+    "dispatch.timeout-gap": {
+      "probe": {
+        "max_inflight": 4,
+        "requested": 24,
+        "round_new_threads": [
+          4,
+          0
+        ],
+        "round_reqthreads_delta": [
+          17,
+          17
+        ],
+        "round_thread_enter_delta": [
+          5,
+          5
+        ],
+        "rounds": 2,
+        "rounds_completed": 2,
+        "settled_active": 0,
+        "settled_idle": 4,
+        "settled_total": 4,
+        "unique_threads": 4,
+        "warm_floor": 4
+      },
+      "status": "ok",
+      "twq_delta": {
+        "bucket_admit_total": [
+          0,
+          0,
+          0,
+          8,
+          0,
+          0
+        ],
+        "bucket_req_total": [
+          0,
+          0,
+          0,
+          98,
+          0,
+          0
+        ],
+        "init_count": 1,
+        "reqthreads_count": 34,
+        "setup_dispatch_count": 1,
+        "should_narrow_true_count": 0,
+        "thread_enter_count": 10,
+        "thread_return_count": 10
+      }
+    },
+    "swift.dispatch-control": {
+      "probe": {
+        "completed": 8,
+        "sum": 28,
+        "tasks": 8,
+        "timed_out": false
+      },
+      "status": "ok",
+      "twq_delta": {
+        "init_count": 1,
+        "reqthreads_count": 15,
+        "setup_dispatch_count": 1,
+        "thread_enter_count": 5,
+        "thread_return_count": 5
+      }
+    },
+    "swift.dispatchmain-taskhandles-after-repeat": {
+      "probe": {
+        "completed_rounds": 64,
+        "delay_ms": 20,
+        "expected_total_sum": 1792,
+        "rounds": 64,
+        "tasks": 8,
+        "total_sum": 1792
+      },
+      "status": "ok",
+      "twq_delta": {
+        "init_count": 1,
+        "reqthreads_count": 2799,
+        "setup_dispatch_count": 1,
+        "thread_enter_count": 934,
+        "thread_return_count": 931
+      }
+    },
+    "swift.mainqueue-resume": {
+      "probe": {
+        "phase": "after-await",
+        "value": 42
+      },
+      "status": "ok",
+      "twq_delta": {
+        "init_count": 1,
+        "reqthreads_count": 13,
+        "setup_dispatch_count": 1,
+        "thread_enter_count": 5,
+        "thread_return_count": 3
+      }
+    }
+  },
+  "schema_version": 1,
+  "source_artifact": "/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260410T120024Z.json",
+  "summary": {
+    "dispatch_modes": 6,
+    "non_ok": [],
+    "swift_modes": 3
+  }
+}

@@ -194,6 +194,19 @@ This roadmap is guided by the current project intent:
   roughly `70-80%` for the real kernel-backed workqueue behavior that matters
   most here, and roughly `45-55%` for broader native-macOS `libdispatch`
   parity overall
+- `done` the real root cause of the staged delayed-child Swift failure is now
+  identified as kernel-side `TWQ` accounting that collapsed constrained and
+  overcommit workers into the same QoS bucket
+- `done` internal kernel `TWQ` accounting is now split by lane
+  (`QoS x {constrained, overcommit}`) while the public sysctl surface remains
+  bucket-aggregated
+- `done` `dispatchmain-taskhandles-after`,
+  `dispatchmain-taskhandles-after-repeat-hooks`,
+  `dispatchmain-taskgroup-after`, and `dispatchmain-taskgroup-sleep` now all
+  complete on the full staged TWQ lane
+- `done` the staged Swift `full` profile now completes end-to-end in the guest
+  after the kernel lane split; only the already-known invalid
+  `customdispatch + stock libthr` control lanes still emit `rc=1` errors
 
 ## Current Gap Versus Native macOS
 
@@ -219,8 +232,8 @@ Important caveat:
 
 1. that `70-80%` reading is a mechanism-coverage estimate for the
    kernel-backed workqueue path;
-2. it is not a claim that higher-level behavioral correctness is already close
-   to macOS while the staged delayed-child boundary remains open.
+2. it is still not a claim that broader macOS parity is close, even though the
+   current staged Swift validation matrix is now green.
 
 Why the second number is still much lower:
 
@@ -230,8 +243,9 @@ Why the second number is still much lower:
 4. worker lifecycle is not kernel-owned the way it is on macOS;
 5. no turnstile-style priority inheritance exists for this path;
 6. no structured macOS-side performance comparison lane is in place yet;
-7. one important staged custom-`libdispatch` delayed child-completion bug is
-   still open in the Swift/TWQ lane.
+7. the current full staged Swift profile still drives high `reqthreads`,
+   `thread_enter`, and `thread_return` churn, so efficiency work remains
+   meaningfully behind macOS even though correctness is much better.
 
 Working interpretation:
 
@@ -259,8 +273,8 @@ Working interpretation:
 | M11 | planned | Apple behavior reference lane | Apple `libdispatch` semantics compared against the port |
 | M11.5 | done | Sustained workload validation | Worker lifecycle and bounded warm-pool behavior hold under longer-running dispatch loads |
 | M11.6 | done | Timeout-isolation validation | Idle retirement and long-gap reuse are both proven independently of short-burst dispatch behavior |
-| M12 | next | C-level delayed-child dispatch fix | Staged `libdispatch` executor-after / delayed-child bug isolated and fixed in the C lane, with Swift validation held steady |
-| M13 | planned | Performance and regression discipline | Zig benchmarks and stable baselines |
+| M12 | done | Swift delayed-resume correctness closure | Kernel lane-split accounting closes the staged delayed-child Swift boundary and the full staged Swift profile now completes |
+| M13 | in_progress | Performance and regression discipline | Zig benchmarks, stable baselines, and post-fix efficiency tuning |
 | M14 | planned | Canonical macOS comparison lane | Structured FreeBSD-vs-macOS comparison |
 | M15 | later | Optional deep integration | Scheduler refinement and possible kevent/workloop decisions |
 
@@ -921,46 +935,41 @@ This milestone closes the exact ambiguity Opus called out. The warm pool is no
 longer just a plausible interpretation of short-burst behavior; idle
 retirement and long-gap reuse are now proven separately and reproducibly.
 
-## M12: C-Level Delayed-Child Dispatch Fix
+## M12: Swift Delayed-Resume Correctness Closure
 
-Status: `next`
+Status: `done`
 
 Goal:
 
 1. close the strongest remaining Tier 1 correctness gap in staged
-   `libdispatch`;
-2. shift the fix vehicle from Swift symptom hunting to C-level dispatch
-   debugging;
-3. keep the current Swift validation lane honest while the real fix target is
-   isolated and repaired.
+   Swift/TWQ validation;
+2. identify the lowest honest fix layer instead of overfitting to the first
+   staged `libdispatch` symptom boundary;
+3. re-run the real staged Swift matrix after the fix instead of claiming
+   victory from a single targeted probe.
 
-Work:
+Completed outcomes:
 
-1. freeze expansion of the Swift probe set for this milestone;
-2. keep the current stable Swift `validation` profile narrow and honest:
-   - `async-smoke`
-   - `dispatch-control`
-   - `mainqueue-resume`
-3. keep the Swift diagnostic matrix as a regression and comparison lane, not
-   as the primary fix vehicle;
-4. make `executor-after` deterministic, or replace it with an equally small
-   pure-C delayed-work reproduction if that proves stronger;
-5. instrument staged `libdispatch` around:
-   - delayed callback wakeup;
-   - executor-style queue wakeup;
-   - `_dispatch_root_queue_poke_slow`;
-   - worker-request issuance and pending state transitions;
-6. compare stock dispatch against staged `GCDX` dispatch for the same
-   executor-style delayed-work pattern;
-7. determine whether staged `libdispatch` is:
-   - failing to request a worker;
-   - requesting too late;
-   - or mishandling resumed work on executor-style queues;
-8. fix the bug in the C dispatch layer first, then re-run the existing Swift
-   diagnostics on top of that change;
-9. defer new Swift workload families until the C-level diagnosis is resolved.
+1. the repo froze Swift workload expansion and used the existing staged Swift
+   diagnostics as the discovery lane while pushing the fix downward;
+2. pure-C delayed-dispatch queue-shape controls and the stricter
+   `main-executor-resume-repeat` mode proved that raw timer-hop-to-executor
+   behavior was healthy on the staged TWQ lane;
+3. staged `libdispatch` tracing narrowed the old symptom boundary usefully,
+   but the final root cause turned out to be lower: kernel `TWQ` accounting
+   was collapsing constrained and overcommit occupancy inside the same QoS
+   bucket;
+4. internal kernel accounting is now split by lane in
+   `/usr/src/sys/kern/kern_thrworkq.c`, while the public `kern.twq.bucket_*`
+   sysctls remain bucket-aggregated;
+5. after that kernel fix, the previously failing staged probe
+   `dispatchmain-taskhandles-after-repeat-hooks` now completes all `64`
+   rounds successfully;
+6. the broader staged Swift `full` profile now completes end-to-end on the
+   guest with no timeout results, aside from the already-known invalid
+   `customdispatch + stock libthr` control lanes.
 
-Current boundary:
+Boundary history and closeout evidence:
 
 1. `twq-swift-async-smoke` succeeds in the guest.
 2. `twq-swift-dispatch-control` succeeds in the guest and increases:
@@ -1007,53 +1016,121 @@ Current boundary:
 14. the same `dispatchmain-taskgroup-after` binary completes on both
     stock-dispatch guest controls, including stock-dispatch plus custom
     `libthr`.
-15. a new C dispatch control, `executor-after-settled`, now exists alongside
-    `executor-after`, and one prior `executor-after` timeout points at delayed
-    work on executor-style queues as the strongest current non-Swift lead.
-16. the current staged Swift boundary is therefore best described as delayed
+15. local Swift 6.3 runtime source inspection now shows that the non-Apple
+    global executor creates per-priority concurrent queues and immediately
+    calls `dispatch_queue_set_width(queue, -3)` on them before using
+    `dispatch_after_f()` for delayed jobs.
+16. the C dispatch probe now has four executor-after queue-shape controls:
+    `executor-after`, `executor-after-settled`,
+    `executor-after-default-width`, and `executor-after-sync-width`.
+17. the latest full guest diagnostic run shows all four of those pure-C
+    delayed-dispatch queue shapes completing successfully on the staged TWQ
+    lane.
+18. that weakens the earlier queue-width hypothesis: the Swift-style async
+    width-narrowing shape is real, but raw delayed C dispatch on that shape is
+    healthy.
+19. the current staged Swift boundary is therefore best described as delayed
     Swift child-task completion awaited by a parent async context on the
-    staged custom `libdispatch` lane, not generic `TaskGroup` suspension,
-    not custom `libthr`, and not `Task.sleep` alone.
-17. host-side symbol inspection now shows the stock Swift 6.3
+    staged custom `libdispatch` lane, beyond the raw C delayed-dispatch queue
+    shape, not generic `TaskGroup` suspension, not custom `libthr`, and not
+    `Task.sleep` alone.
+20. host-side symbol inspection now shows the stock Swift 6.3
     `libdispatch.so` does not reference `_pthread_workqueue_init`,
     `_pthread_workqueue_addthreads`, or the other workqueue entry points,
     while the staged custom `libdispatch.so` does.
-18. the guest-side stock-dispatch plus custom-`libthr` delayed-child control
+21. the guest-side stock-dispatch plus custom-`libthr` delayed-child control
     completes successfully, but its `kern.twq.reqthreads_count` and
     `kern.twq.thread_enter_count` values stay flat across the probe window.
-19. that makes the stock-dispatch plus custom-`libthr` lane a useful
+22. that makes the stock-dispatch plus custom-`libthr` lane a useful
     Swift/runtime comparison lane, but not evidence that the stock Swift 6.3
     dispatch runtime is using TWQ.
-20. a new pure-C `worker-after-group` dispatch mode completes successfully on
+23. a new pure-C `worker-after-group` dispatch mode completes successfully on
     the staged TWQ lane, so raw delayed callbacks plus parent waiting do work
     below Swift.
-21. a new Swift `dispatchmain-taskhandles-after` probe times out on the staged
+24. a new Swift `dispatchmain-taskhandles-after` probe times out on the staged
     TWQ lane while passing on the stock host Swift 6.3 lane, so the remaining
     boundary is not `TaskGroup` alone. It is the interaction between staged
     custom `libdispatch` and multiple delayed Swift child-task resumptions.
+25. guest-side control runs now show `dispatchmain-taskhandles-after`
+    completing on both stock-dispatch lanes:
+    stock `libthr` and custom `libthr`.
+26. in the failing staged `dispatchmain-taskhandles-after` run, every child
+    still reaches `child-after-await-*`, while the parent stalls after
+    `parent-awaiting-1`.
+27. that moves the remaining blame off generic Swift future completion and
+    off custom `libthr`; the strongest remaining fault line is staged
+    workqueue-enabled `libdispatch`.
+28. the most specific staged lead is now non-thread-bound `dispatchMain()`
+    main-queue / executor redrive under the workqueue-backed lane.
+29. a new repeated delayed-child stress control,
+    `dispatchmain-taskhandles-after-repeat-stockdispatch-customthr`,
+    completes all `64` rounds on the same guest while still using the custom
+    `libthr` TWQ bridge.
+30. the matching full staged repeat lane,
+    `dispatchmain-taskhandles-after-repeat-hooks`, still times out.
+31. focused hook and staged-`libdispatch` tracing now show that the failing
+    late child resumptions still reach:
+    - Swift `enqueueGlobal`
+    - `dispatch_async_f`
+    - staged `libdispatch` `continuation_async`
+32. those same resumptions stop before the staged `libdispatch` callout /
+    invoke path runs them on the `Swift global concurrent queue`.
+33. that removes kernel `TWQ` worker supply and the custom `libthr` bridge
+    from the critical-path suspect set for this failure class.
+34. `customdispatch + stock libthr` is not a valid runtime control here,
+    because staged `libdispatch` expects custom-`libthr` symbols such as
+    `qos_class_main`.
+35. a new pure-C `main-executor-resume-repeat` mode now completes all `64`
+    rounds on the staged TWQ lane while using the same essential timer-queue
+    to executor-queue hop as the failing Swift repeat probe.
+36. that rules out the simple timer-hop theory, but does not clear staged
+    `libdispatch` itself.
+37. the decisive root-cause correction is now in place:
+    internal kernel `TWQ` accounting distinguishes constrained and
+    overcommit lanes per QoS bucket instead of collapsing them together.
+38. the previously failing staged repeat run,
+    `dispatchmain-taskhandles-after-repeat-hooks`, now completes all `64`
+    rounds on the full TWQ lane:
+    `/Users/me/wip-gcd-tbb-fx/artifacts/twq-dev-taskhandles-repeat-hooks-swiftonly-lanesplit.serial.log`
+39. the broader staged Swift `full` profile now completes cleanly too:
+    `/Users/me/wip-gcd-tbb-fx/artifacts/twq-dev-swift-full-post-lanesplit.serial.log`
+40. that full profile includes successful staged results for the earlier M12
+    blockers:
+    - `dispatchmain-spawnwait-sleep`
+    - `dispatchmain-spawnwait-after`
+    - `dispatchmain-taskhandles-after`
+    - `dispatchmain-taskhandles-after-repeat`
+    - `dispatchmain-taskgroup-after`
+    - `dispatchmain-taskgroup-sleep`
+    - `dispatchmain-taskgroup-sleep-next`
+41. the only remaining non-`ok` Swift entries in the full profile are the
+    already-known invalid `customdispatch + stock libthr` control lanes,
+    which fail because staged `libdispatch` expects custom-`libthr` symbols
+    such as `qos_class_main`.
 
 Exit criteria:
 
-1. the repo has a deterministic or equivalently strong pure-C reproduction for
-   the staged executor-after / delayed-child class of failure;
-2. staged `libdispatch` instrumentation explains the divergence between stock
-   and staged delayed-work behavior;
-3. the C-level delayed-child / executor-style queue bug is fixed or reduced to
-   a tighter, documented dispatch-layer boundary;
-4. the existing required Swift `validation` profile remains green;
-5. at least one existing staged Swift delayed-child diagnostic is re-run after
-   the C-level fix and shows either resolution or a materially tighter
-   residual boundary.
+1. the delayed-child Swift boundary is closed on the real staged TWQ lane;
+2. the existing required Swift `validation` profile remains green;
+3. the stronger staged delayed-child diagnostics are re-run after the fix and
+   now complete;
+4. the repo has a documented explanation for why the earlier staged
+   `libdispatch` symptom boundary was incomplete;
+5. the next milestone can shift from correctness isolation to performance and
+   regression discipline.
 
 Why it matters:
 
-The project has already used Swift correctly as the discovery lane. The next
-honest step is to fix the strongest remaining staged-dispatch correctness gap
-at Layer B instead of continuing to refine the symptom description at Layer A.
+This closes the strongest remaining Tier 1 Swift correctness gap in the
+current validation matrix. The important lesson is architectural: staged
+`libdispatch` tracing was useful narrowing work, but the final bug sat lower
+than that symptom boundary. The next honest step is no longer more delayed
+resume isolation. It is performance discipline, efficiency tuning, and then
+macOS comparison with the correctness floor in place.
 
 ## M13: Performance and Regression Discipline
 
-Status: `planned`
+Status: `in_progress`
 
 Goal:
 
@@ -1067,6 +1144,84 @@ Work:
 2. capture stable JSON benchmark output;
 3. archive baselines by kernel revision;
 4. start gating obvious regressions once the baseline is trustworthy.
+
+Current progress:
+
+1. the repo now has a reproducible host-side benchmark lane in
+   `scripts/benchmarks/run-m13-baseline.sh`;
+2. the guest serial output can now be normalized into a structured baseline via
+   `scripts/benchmarks/extract-m13-baseline.py`;
+3. the first compact baseline is checked in at
+   `benchmarks/baselines/m13-initial.json`;
+4. the first recorded baseline shows all `6` selected dispatch modes and all
+   `3` selected Swift modes completing with `ok` status;
+5. the next optimization target is clear from that baseline:
+   repeated continuation-heavy lanes still generate high
+   `reqthreads` / `thread_enter` / `thread_return` churn.
+6. a second verification run preserved the same qualitative hotspot pattern but
+   still showed enough numeric drift that hard regression gating would be
+   premature before the noise floor is characterized.
+7. focused repeat-only telemetry now shows that the remaining hotspot is not
+   just cold-start noise:
+   `dispatch.main-executor-resume-repeat` keeps a steady `reqthreads` mean of
+   `7.55` per round with `bucket_total` pinned at `5`, while
+   `swift.dispatchmain-taskhandles-after-repeat` still averages `41.73`
+   `reqthreads` per round late in the run.
+8. `scripts/libthr/prepare-stage.sh` now auto-selects the freshest `libthr`
+   objdir, fixing a stale-stage bug that had masked the first live M13 tuning
+   result.
+9. `/usr/src/lib/libthr/thread/thr_workq.c` now has a same-lane handoff fast
+   path that skips a redundant return/enter cycle when a worker immediately
+   claims more work in the same kernel bucket.
+10. the first two real post-fix repeat-only runs reduced
+    `dispatch.main-executor-resume-repeat` from a pre-fix mean of
+    `reqthreads +546 / enter +183 / return +180` to
+    `+379 / +172 / +169` and `+320 / +150 / +147`.
+11. the same tuning pass reduced
+    `swift.dispatchmain-taskhandles-after-repeat` request churn from a
+    pre-fix mean of `reqthreads +2659.5 / enter +887.5 / return +884.5` to
+    `+1630 / +780 / +777` and `+1863 / +884 / +881`, but the traced proof run
+    also shows that cross-lane handoffs still dominate the remaining cost.
+12. `TWQ_OP_THREAD_TRANSFER` now exists in the kernel and `libthr`, so a worker
+    that claims work from a different lane can move directly into that lane
+    instead of always doing a full return/re-enter cycle.
+13. the first current-branch transfer experiments were initially misleading
+    because the guest did not yet contain the new code:
+    the kernel had to be rebuilt first, and then the staged `libthr` had to be
+    refreshed from newly rebuilt `/tmp/twqlibobj/.../*.pico` objects.
+14. once both were real, the traced run at
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260413T112356Z.serial.log`
+    showed `worker-handoff-transfer: 183`,
+    `worker-handoff-enter: 0`, and
+    `worker-handoff-fastpath: 85`, proving that the new cross-lane path was
+    live in the guest.
+15. the two clean post-transfer runs moved
+    `dispatch.main-executor-resume-repeat` to
+    `+380 / +169 / +166` and `+354 / +163 / +160`, which keeps the C lane in
+    roughly the same band as the earlier same-lane-only tuning.
+16. the same two clean runs moved
+    `swift.dispatchmain-taskhandles-after-repeat` to
+    `+1371 / +460 / +457` and `+1500 / +506 / +503`, which is materially below
+    the earlier same-lane-only Swift result and closes cross-lane recycling as
+    the leading unknown.
+17. the next honest M13 target is now staged `libdispatch` request generation
+    and wake policy across root queues, not another round of worker recycling
+    changes inside `libthr`.
+18. a follow-up staged-`libdispatch` experiment that tried to cap drain-side
+    repokes with an active-worker counter was rejected and reverted:
+    the proof trace only hit the new `drain-one-skip-poke` path `2` times
+    while `root-queue-poke-slow` still fired `988` times, so that heuristic is
+    not the real lever.
+19. a second follow-up `libthr` experiment that tried to skip kernel
+    `REQTHREADS` when a lane's `tbr_ready` count already covered
+    `tbr_pending` was also rejected and reverted:
+    the traced proof run only hit `addthreads-covered` `4` times against
+    `addthreads-begin: 952`, and the repeat-only Swift lane did not show a
+    stable improvement across
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260413T115402Z.json`,
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260413T115538Z.json`,
+    and
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260413T115743Z.json`.
 
 Exit criteria:
 

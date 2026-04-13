@@ -11,6 +11,8 @@ Environment:
   TWQ_SWIFT_TOOLCHAIN_ROOT       Extracted toolchain root
   TWQ_SWIFT_STAGE_DIR            Guest staging directory for Swift runtime libs
   TWQ_SWIFT_STOCK_DISPATCH_STAGE_DIR Guest staging directory for stock toolchain Dispatch libs
+  TWQ_SWIFT_CONCURRENCY_OVERRIDE_SO Optional replacement libswift_Concurrency.so
+  TWQ_SWIFT_CONCURRENCY_HOOK_TRACE_SO Output shared library for Swift concurrency hook tracing
   TWQ_SWIFT_ASYNC_SMOKE_BIN      Output binary for the Swift async smoke probe
   TWQ_SWIFT_ASYNC_YIELD_BIN      Output binary for the Swift async yield probe
   TWQ_SWIFT_ASYNC_SLEEP_BIN      Output binary for the Swift async sleep probe
@@ -29,6 +31,7 @@ Environment:
   TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_BIN Output binary for the Swift dispatchMain TaskGroup probe
   TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_AFTER_BIN Output binary for the Swift dispatchMain TaskGroup after probe
   TWQ_SWIFT_DISPATCHMAIN_TASKHANDLES_AFTER_BIN Output binary for the Swift dispatchMain Task-handles after probe
+  TWQ_SWIFT_DISPATCHMAIN_TASKHANDLES_AFTER_REPEAT_BIN Output binary for the repeated Swift dispatchMain Task-handles after stress probe
   TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_YIELD_BIN Output binary for the Swift dispatchMain TaskGroup yield probe
   TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_ONESLEEP_BIN Output binary for the Swift dispatchMain TaskGroup one-sleep probe
   TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_SLEEP_BIN Output binary for the Swift dispatchMain TaskGroup sleep probe
@@ -69,6 +72,8 @@ swift_distfile=${TWQ_SWIFT_DISTFILE:-/Users/me/wip-rnx/freebsd-swift630-artifact
 toolchain_root=${TWQ_SWIFT_TOOLCHAIN_ROOT:-/Users/me/wip-rnx/nx-/swift-source-vx-modified/install/rnx-vx-swift63-selfhost-install5/usr}
 swift_stage_dir=${TWQ_SWIFT_STAGE_DIR:-${artifacts_root}/swift-stage}
 swift_stock_dispatch_stage_dir=${TWQ_SWIFT_STOCK_DISPATCH_STAGE_DIR:-${artifacts_root}/swift-stock-dispatch-stage}
+swift_concurrency_override_so=${TWQ_SWIFT_CONCURRENCY_OVERRIDE_SO:-}
+swift_concurrency_hook_trace_so=${TWQ_SWIFT_CONCURRENCY_HOOK_TRACE_SO:-${artifacts_root}/swift/lib/libtwq-swift-concurrency-hooks.so}
 async_smoke_bin=${TWQ_SWIFT_ASYNC_SMOKE_BIN:-${artifacts_root}/swift/bin/twq-swift-async-smoke}
 async_yield_bin=${TWQ_SWIFT_ASYNC_YIELD_BIN:-${artifacts_root}/swift/bin/twq-swift-async-yield}
 async_sleep_bin=${TWQ_SWIFT_ASYNC_SLEEP_BIN:-${artifacts_root}/swift/bin/twq-swift-async-sleep}
@@ -87,6 +92,7 @@ dispatchmain_sleep_bin=${TWQ_SWIFT_DISPATCHMAIN_SLEEP_BIN:-${artifacts_root}/swi
 dispatchmain_taskgroup_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_BIN:-${artifacts_root}/swift/bin/twq-swift-dispatchmain-taskgroup}
 dispatchmain_taskgroup_after_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_AFTER_BIN:-${artifacts_root}/swift/bin/twq-swift-dispatchmain-taskgroup-after}
 dispatchmain_taskhandles_after_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKHANDLES_AFTER_BIN:-${artifacts_root}/swift/bin/twq-swift-dispatchmain-taskhandles-after}
+dispatchmain_taskhandles_after_repeat_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKHANDLES_AFTER_REPEAT_BIN:-${artifacts_root}/swift/bin/twq-swift-dispatchmain-taskhandles-after-repeat}
 dispatchmain_taskgroup_yield_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_YIELD_BIN:-${artifacts_root}/swift/bin/twq-swift-dispatchmain-taskgroup-yield}
 dispatchmain_taskgroup_onesleep_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_ONESLEEP_BIN:-${artifacts_root}/swift/bin/twq-swift-dispatchmain-taskgroup-onesleep}
 dispatchmain_taskgroup_sleep_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_SLEEP_BIN:-${artifacts_root}/swift/bin/twq-swift-dispatchmain-taskgroup-sleep}
@@ -121,6 +127,7 @@ dispatchmain_sleep_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_sleep.swift
 dispatchmain_taskgroup_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_taskgroup.swift
 dispatchmain_taskgroup_after_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_taskgroup_after.swift
 dispatchmain_taskhandles_after_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_taskhandles_after.swift
+dispatchmain_taskhandles_after_repeat_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_taskhandles_after_repeat.swift
 dispatchmain_taskgroup_yield_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_taskgroup_yield.swift
 dispatchmain_taskgroup_onesleep_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_taskgroup_onesleep.swift
 dispatchmain_taskgroup_sleep_src=${repo_root}/swiftsrc/twq_swift_dispatchmain_taskgroup_sleep.swift
@@ -137,6 +144,7 @@ taskgroup_immediate_src=${repo_root}/swiftsrc/twq_swift_taskgroup_immediate.swif
 taskgroup_yield_src=${repo_root}/swiftsrc/twq_swift_taskgroup_yield.swift
 taskgroup_src=${repo_root}/swiftsrc/twq_swift_taskgroup_precheck.swift
 dispatch_src=${repo_root}/swiftsrc/twq_swift_dispatch_control.swift
+swift_hook_trace_src=${repo_root}/csrc/twq_swift_concurrency_hooks.cpp
 guest_rpath=/root/twq-swift/usr/lib/swift/freebsd
 
 if [ ! -x "$toolchain_root/bin/swiftc" ] && [ ! -x "$toolchain_root/usr/bin/swiftc" ]; then
@@ -160,22 +168,41 @@ else
   exit 66
 fi
 
+if [ -x "$swift_usr_root/bin/clang++" ]; then
+  clangxx_bin="$swift_usr_root/bin/clang++"
+elif command -v clang++ >/dev/null 2>&1; then
+  clangxx_bin=$(command -v clang++)
+else
+  echo "C++ compiler not found for Swift hook trace library build" >&2
+  exit 66
+fi
+
 mkdir -p "$(dirname "$async_smoke_bin")" "$(dirname "$async_yield_bin")" "$(dirname "$async_sleep_bin")" \
   "$(dirname "$mainqueue_resume_bin")" "$(dirname "$mainactor_sleep_bin")" \
   "$(dirname "$mainactor_taskgroup_bin")" "$(dirname "$dispatchmain_spawn_bin")" \
   "$(dirname "$dispatchmain_spawnwait_yield_bin")" "$(dirname "$dispatchmain_spawnwait_sleep_bin")" "$(dirname "$dispatchmain_spawnwait_after_bin")" \
   "$(dirname "$dispatchmain_spawned_yield_bin")" "$(dirname "$dispatchmain_spawned_sleep_bin")" \
   "$(dirname "$dispatchmain_yield_bin")" "$(dirname "$dispatchmain_continuation_bin")" "$(dirname "$dispatchmain_sleep_bin")" \
-  "$(dirname "$dispatchmain_taskgroup_bin")" "$(dirname "$dispatchmain_taskgroup_after_bin")" "$(dirname "$dispatchmain_taskhandles_after_bin")" "$(dirname "$dispatchmain_taskgroup_yield_bin")" "$(dirname "$dispatchmain_taskgroup_onesleep_bin")" \
+  "$(dirname "$dispatchmain_taskgroup_bin")" "$(dirname "$dispatchmain_taskgroup_after_bin")" "$(dirname "$dispatchmain_taskhandles_after_bin")" "$(dirname "$dispatchmain_taskhandles_after_repeat_bin")" "$(dirname "$dispatchmain_taskgroup_yield_bin")" "$(dirname "$dispatchmain_taskgroup_onesleep_bin")" \
   "$(dirname "$dispatchmain_taskgroup_sleep_bin")" "$(dirname "$dispatchmain_taskgroup_sleep_next_bin")" "$(dirname "$detached_sleep_bin")" \
   "$(dirname "$detached_taskgroup_bin")" "$(dirname "$continuation_resume_bin")" \
   "$(dirname "$spawned_continuation_bin")" "$(dirname "$spawned_yield_bin")" "$(dirname "$spawned_sleep_bin")" "$(dirname "$task_spawn_bin")" \
   "$(dirname "$taskgroup_spawned_bin")" \
   "$(dirname "$taskgroup_immediate_bin")" "$(dirname "$taskgroup_yield_bin")" \
-  "$(dirname "$taskgroup_bin")" "$(dirname "$dispatch_bin")"
+  "$(dirname "$taskgroup_bin")" "$(dirname "$dispatch_bin")" "$(dirname "$swift_concurrency_hook_trace_so")"
 mkdir -p "$swift_stage_dir/usr/lib/swift" "$swift_stock_dispatch_stage_dir"
 rm -rf "$swift_stage_dir/usr/lib/swift/freebsd"
 cp -a "$swift_usr_root/lib/swift/freebsd" "$swift_stage_dir/usr/lib/swift/"
+
+if [ -n "$swift_concurrency_override_so" ]; then
+  if [ ! -f "$swift_concurrency_override_so" ]; then
+    echo "Swift concurrency override library not found: $swift_concurrency_override_so" >&2
+    exit 66
+  fi
+  cp -f "$swift_concurrency_override_so" \
+    "$swift_stage_dir/usr/lib/swift/freebsd/libswift_Concurrency.so"
+fi
+
 rm -f "$swift_stage_dir/usr/lib/swift/freebsd/libdispatch.so"
 rm -f "$swift_stage_dir/usr/lib/swift/freebsd/libBlocksRuntime.so"
 rm -f "$swift_stock_dispatch_stage_dir/libdispatch.so" "$swift_stock_dispatch_stage_dir/libBlocksRuntime.so"
@@ -312,6 +339,13 @@ cp -a "$swift_usr_root/lib/swift/freebsd/libBlocksRuntime.so" "$swift_stock_disp
   -parse-as-library \
   -no-toolchain-stdlib-rpath \
   -Xlinker -rpath -Xlinker "$guest_rpath" \
+  "$dispatchmain_taskhandles_after_repeat_src" \
+  -o "$dispatchmain_taskhandles_after_repeat_bin"
+
+"$swiftc_bin" \
+  -parse-as-library \
+  -no-toolchain-stdlib-rpath \
+  -Xlinker -rpath -Xlinker "$guest_rpath" \
   "$dispatchmain_taskgroup_yield_src" \
   -o "$dispatchmain_taskgroup_yield_bin"
 
@@ -419,3 +453,10 @@ cp -a "$swift_usr_root/lib/swift/freebsd/libBlocksRuntime.so" "$swift_stock_disp
   -Xlinker -rpath -Xlinker "$guest_rpath" \
   "$dispatch_src" \
   -o "$dispatch_bin"
+
+"$clangxx_bin" \
+  -std=c++17 \
+  -fPIC \
+  -shared \
+  "$swift_hook_trace_src" \
+  -o "$swift_concurrency_hook_trace_so"

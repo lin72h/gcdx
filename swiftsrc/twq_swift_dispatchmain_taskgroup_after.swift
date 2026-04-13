@@ -24,14 +24,10 @@ struct Main {
       let sum = await withTaskGroup(of: Int.self, returning: Int.self) { group in
         for i in 0..<tasks {
           group.addTask {
-            if i < 2 {
-              emit("progress", "\"mode\":\"dispatchmain-taskgroup-after\",\"phase\":\"child-start-\(i)\"")
-            }
+            emit("progress", "\"mode\":\"dispatchmain-taskgroup-after\",\"phase\":\"child-start-\(i)\"")
             return await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
               DispatchQueue.global(qos: .default).asyncAfter(deadline: .now() + .milliseconds(20)) {
-                if i < 2 {
-                  emit("progress", "\"mode\":\"dispatchmain-taskgroup-after\",\"phase\":\"child-after-delay-\(i)\"")
-                }
+                emit("progress", "\"mode\":\"dispatchmain-taskgroup-after\",\"phase\":\"child-after-delay-\(i)\"")
                 continuation.resume(returning: i)
               }
             }
@@ -42,6 +38,10 @@ struct Main {
         for await value in group {
           completed += 1
           total += value
+          emit(
+            "progress",
+            "\"mode\":\"dispatchmain-taskgroup-after\",\"phase\":\"group-next\",\"completed\":\(completed),\"value\":\(value),\"sum\":\(total)"
+          )
         }
         return total
       }

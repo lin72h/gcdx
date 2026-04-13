@@ -12,6 +12,8 @@ Thumbs.db
 *.temp
 *.orig
 *.rej
+*.pyc
+__pycache__/
 
 # Logs and crash artifacts
 *.log

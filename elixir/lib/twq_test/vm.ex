@@ -226,6 +226,9 @@ defmodule TwqTest.VM do
     dispatch_sustained_line =
       dispatch_probe_line_for_mode(dispatch_probe_lines, "\"mode\":\"sustained\"")
 
+    dispatch_resume_repeat_line =
+      dispatch_probe_line_for_mode(dispatch_probe_lines, "\"mode\":\"main-executor-resume-repeat\"")
+
     swift_async_smoke_line =
       dispatch_probe_line_for_mode(swift_probe_lines, "\"mode\":\"async-smoke\"")
 
@@ -317,6 +320,20 @@ defmodule TwqTest.VM do
         serial_log,
         "=== twq dispatch sustained stats after ===",
         "=== twq dispatch sustained stats after end ==="
+      )
+
+    dispatch_resume_repeat_before =
+      extract_section(
+        serial_log,
+        "=== twq dispatch main-executor-resume-repeat stats before ===",
+        "=== twq dispatch main-executor-resume-repeat stats before end ==="
+      )
+
+    dispatch_resume_repeat_after =
+      extract_section(
+        serial_log,
+        "=== twq dispatch main-executor-resume-repeat stats after ===",
+        "=== twq dispatch main-executor-resume-repeat stats after end ==="
       )
 
     swift_dispatch_before =
@@ -619,6 +636,43 @@ defmodule TwqTest.VM do
        section_array_value(dispatch_sustained_after, "kern.twq.bucket_idle_current") == [0, 0, 0, 0, 0, 0]},
       {"dispatch sustained after bucket active zero",
        section_array_value(dispatch_sustained_after, "kern.twq.bucket_active_current") == [0, 0, 0, 0, 0, 0]},
+      {"dispatch resume-repeat status",
+       dispatch_resume_repeat_line == "" or
+         String.contains?(dispatch_resume_repeat_line, "\"status\":\"ok\"")},
+      {"dispatch resume-repeat timed_out",
+       dispatch_resume_repeat_line == "" or
+         String.contains?(dispatch_resume_repeat_line, "\"timed_out\":false")},
+      {"dispatch resume-repeat rounds complete",
+       dispatch_resume_repeat_line == "" or
+         line_int_value(dispatch_resume_repeat_line, "completed_rounds") ==
+           line_int_value(dispatch_resume_repeat_line, "rounds")},
+      {"dispatch resume-repeat expected total",
+       dispatch_resume_repeat_line == "" or
+         line_int_value(dispatch_resume_repeat_line, "total_sum") ==
+           line_int_value(dispatch_resume_repeat_line, "expected_total_sum")},
+      {"dispatch resume-repeat main thread callbacks",
+       dispatch_resume_repeat_line == "" or
+         String.contains?(dispatch_resume_repeat_line, "\"main_thread_callbacks\":0")},
+      {"dispatch resume-repeat reqthreads_count delta",
+       dispatch_resume_repeat_line == "" or
+         section_value(dispatch_resume_repeat_after, "kern.twq.reqthreads_count") >
+           section_value(dispatch_resume_repeat_before, "kern.twq.reqthreads_count")},
+      {"dispatch resume-repeat thread_enter_count delta",
+       dispatch_resume_repeat_line == "" or
+         section_value(dispatch_resume_repeat_after, "kern.twq.thread_enter_count") >
+           section_value(dispatch_resume_repeat_before, "kern.twq.thread_enter_count")},
+      {"dispatch resume-repeat after bucket total zero",
+       dispatch_resume_repeat_line == "" or
+         section_array_value(dispatch_resume_repeat_after, "kern.twq.bucket_total_current") ==
+           [0, 0, 0, 0, 0, 0]},
+      {"dispatch resume-repeat after bucket idle zero",
+       dispatch_resume_repeat_line == "" or
+         section_array_value(dispatch_resume_repeat_after, "kern.twq.bucket_idle_current") ==
+           [0, 0, 0, 0, 0, 0]},
+      {"dispatch resume-repeat after bucket active zero",
+       dispatch_resume_repeat_line == "" or
+         section_array_value(dispatch_resume_repeat_after, "kern.twq.bucket_active_current") ==
+           [0, 0, 0, 0, 0, 0]},
       {"swift async smoke status", String.contains?(swift_async_smoke_line, "\"status\":\"ok\"")},
       {"swift dispatch status", String.contains?(swift_dispatch_line, "\"status\":\"ok\"")},
       {"swift dispatch completed", line_int_value(swift_dispatch_line, "completed") == 8},

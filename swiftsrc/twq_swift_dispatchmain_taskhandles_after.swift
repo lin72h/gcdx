@@ -23,26 +23,36 @@ struct Main {
 
       let handles = (0..<tasks).map { i in
         Task<Int, Never> {
-          if i < 2 {
-            emit("progress", "\"mode\":\"dispatchmain-taskhandles-after\",\"phase\":\"child-start-\(i)\"")
-          }
-          return await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
+          emit("progress", "\"mode\":\"dispatchmain-taskhandles-after\",\"phase\":\"child-start-\(i)\"")
+          let value = await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
             DispatchQueue.global(qos: .default).asyncAfter(deadline: .now() + .milliseconds(20)) {
-              if i < 2 {
-                emit("progress", "\"mode\":\"dispatchmain-taskhandles-after\",\"phase\":\"child-after-delay-\(i)\"")
-              }
+              emit("progress", "\"mode\":\"dispatchmain-taskhandles-after\",\"phase\":\"child-after-delay-\(i)\"")
               continuation.resume(returning: i)
             }
           }
+          emit(
+            "progress",
+            "\"mode\":\"dispatchmain-taskhandles-after\",\"phase\":\"child-after-await-\(i)\",\"value\":\(value)"
+          )
+          return value
         }
       }
 
       emit("progress", "\"mode\":\"dispatchmain-taskhandles-after\",\"phase\":\"parent-before-await\"")
       var completed = 0
       var sum = 0
-      for handle in handles {
-        sum += await handle.value
+      for (index, handle) in handles.enumerated() {
+        emit(
+          "progress",
+          "\"mode\":\"dispatchmain-taskhandles-after\",\"phase\":\"parent-awaiting-\(index)\",\"completed\":\(completed),\"sum\":\(sum)"
+        )
+        let value = await handle.value
+        sum += value
         completed += 1
+        emit(
+          "progress",
+          "\"mode\":\"dispatchmain-taskhandles-after\",\"phase\":\"parent-after-await-\(index)\",\"completed\":\(completed),\"value\":\(value),\"sum\":\(sum)"
+        )
       }
 
       emit(

@@ -31,7 +31,17 @@ done
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_root=$(CDPATH= cd -- "${script_dir}/../.." && pwd)
 
-manual_so=${TWQ_LIBPTHREAD_MANUAL_SO:-/tmp/twqlibobj/usr/src/amd64.amd64/lib/libthr/libthr.so.3.full.manual}
+choose_default_manual_so() {
+  latest_pico=$(find /tmp/twqlibobj -type f -path '*/lib/libthr/thr_workq.pico' \
+    -exec stat -f '%m %N' {} \; 2>/dev/null | sort -nr | head -n 1 | cut -d' ' -f2-)
+  if [ -n "${latest_pico}" ]; then
+    printf '%s/libthr.so.3.full.manual\n' "$(dirname "${latest_pico}")"
+  else
+    printf '%s\n' /tmp/twqlibobj/usr/src/amd64.amd64/lib/libthr/libthr.so.3.full.manual
+  fi
+}
+
+manual_so=${TWQ_LIBPTHREAD_MANUAL_SO:-$(choose_default_manual_so)}
 manual_objdir=${TWQ_LIBPTHREAD_OBJDIR:-$(dirname "$manual_so")}
 stage_dir=${TWQ_LIBPTHREAD_STAGE_DIR:-${repo_root}/../artifacts/libthr-stage}
 relink_manual=${TWQ_LIBPTHREAD_RELINK:-1}

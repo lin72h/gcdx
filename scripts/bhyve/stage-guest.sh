@@ -50,8 +50,15 @@ Environment:
   TWQ_LIBDISPATCH_STAGE_DIR Directory containing staged libdispatch libraries
   TWQ_SWIFT_STAGE_DIR       Directory containing staged Swift runtime libraries
   TWQ_SWIFT_STOCK_DISPATCH_STAGE_DIR Directory containing stock toolchain Dispatch libraries
+  TWQ_SWIFT_CONCURRENCY_HOOK_TRACE_SO Shared library that installs Swift concurrency enqueue hooks
+  TWQ_PREPARE_LIBTHR_STAGE  Optional non-empty value to refresh staged libthr before guest staging
+  TWQ_PREPARE_LIBDISPATCH_STAGE Optional non-empty value to refresh staged libdispatch before guest staging
+  TWQ_PREPARE_SWIFT_STAGE   Optional non-empty value to refresh staged Swift probes/runtime before guest staging
+  TWQ_SWIFT_CONCURRENCY_OVERRIDE_SO Optional replacement libswift_Concurrency.so used while refreshing Swift stage
   TWQ_SWIFT_PROBE_PROFILE   `validation` for the stable Swift lane, `full` for diagnostics too
+  TWQ_DISPATCH_PROBE_FILTER Optional comma-separated dispatch probe mode filter
   TWQ_SWIFT_PROBE_FILTER    Optional comma-separated Swift probe mode filter
+  TWQ_SWIFT_RUNTIME_TRACE   Optional value for SWIFT_TWQ_TRACE_CONCURRENCY inside guest
 EOF
 }
 
@@ -103,6 +110,7 @@ swift_dispatchmain_sleep_bin=${TWQ_SWIFT_DISPATCHMAIN_SLEEP_BIN:-${repo_root}/..
 swift_dispatchmain_taskgroup_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-dispatchmain-taskgroup}
 swift_dispatchmain_taskgroup_after_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_AFTER_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-dispatchmain-taskgroup-after}
 swift_dispatchmain_taskhandles_after_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKHANDLES_AFTER_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-dispatchmain-taskhandles-after}
+swift_dispatchmain_taskhandles_after_repeat_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKHANDLES_AFTER_REPEAT_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-dispatchmain-taskhandles-after-repeat}
 swift_dispatchmain_taskgroup_yield_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_YIELD_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-dispatchmain-taskgroup-yield}
 swift_dispatchmain_taskgroup_onesleep_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_ONESLEEP_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-dispatchmain-taskgroup-onesleep}
 swift_dispatchmain_taskgroup_sleep_bin=${TWQ_SWIFT_DISPATCHMAIN_TASKGROUP_SLEEP_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-dispatchmain-taskgroup-sleep}
@@ -119,12 +127,19 @@ swift_taskgroup_immediate_bin=${TWQ_SWIFT_TASKGROUP_IMMEDIATE_BIN:-${repo_root}/
 swift_taskgroup_yield_bin=${TWQ_SWIFT_TASKGROUP_YIELD_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-taskgroup-yield}
 swift_taskgroup_probe_bin=${TWQ_SWIFT_TASKGROUP_PROBE_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-taskgroup-precheck}
 swift_dispatch_probe_bin=${TWQ_SWIFT_DISPATCH_PROBE_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-dispatch-control}
+swift_concurrency_hook_trace_so=${TWQ_SWIFT_CONCURRENCY_HOOK_TRACE_SO:-${repo_root}/../artifacts/swift/lib/libtwq-swift-concurrency-hooks.so}
 pthread_stage_dir=${TWQ_LIBPTHREAD_STAGE_DIR:-${repo_root}/../artifacts/libthr-stage}
 dispatch_stage_dir=${TWQ_LIBDISPATCH_STAGE_DIR:-${repo_root}/../artifacts/libdispatch-stage}
 swift_stage_dir=${TWQ_SWIFT_STAGE_DIR:-${repo_root}/../artifacts/swift-stage}
 swift_stock_dispatch_stage_dir=${TWQ_SWIFT_STOCK_DISPATCH_STAGE_DIR:-${repo_root}/../artifacts/swift-stock-dispatch-stage}
+prepare_libthr_stage=${TWQ_PREPARE_LIBTHR_STAGE:-}
+prepare_libdispatch_stage=${TWQ_PREPARE_LIBDISPATCH_STAGE:-}
+prepare_swift_stage=${TWQ_PREPARE_SWIFT_STAGE:-}
+swift_concurrency_override_so=${TWQ_SWIFT_CONCURRENCY_OVERRIDE_SO:-}
 swift_probe_profile=${TWQ_SWIFT_PROBE_PROFILE:-validation}
+dispatch_probe_filter=${TWQ_DISPATCH_PROBE_FILTER:-}
 swift_probe_filter=${TWQ_SWIFT_PROBE_FILTER:-}
+swift_runtime_trace=${TWQ_SWIFT_RUNTIME_TRACE:-}
 
 if [ -z "$vm_image" ] || [ -z "$guest_root" ]; then
   echo "TWQ_VM_IMAGE and TWQ_GUEST_ROOT are required unless --dry-run is used" >&2
@@ -146,6 +161,20 @@ append_if_missing() {
     return 0
   fi
   printf '%s\n' "$line" | doas tee -a "$target" >/dev/null
+}
+
+prepare_runtime_stage() {
+  label=$1
+  script=$2
+  shift 2
+
+  if [ ! -f "$script" ]; then
+    echo "Stage refresh script not found for ${label}: $script" >&2
+    exit 66
+  fi
+
+  echo "Refreshing ${label} stage via ${script}" >&2
+  env "$@" sh "$script"
 }
 
 if [ "$dry_run" -eq 1 ]; then
@@ -174,6 +203,7 @@ copy Swift dispatchMain sleep probe ${swift_dispatchmain_sleep_bin} into guest
 copy Swift dispatchMain TaskGroup probe ${swift_dispatchmain_taskgroup_bin} into guest
 copy Swift dispatchMain TaskGroup after probe ${swift_dispatchmain_taskgroup_after_bin} into guest
 copy Swift dispatchMain Task-handles after probe ${swift_dispatchmain_taskhandles_after_bin} into guest
+copy Swift dispatchMain repeated Task-handles after stress probe ${swift_dispatchmain_taskhandles_after_repeat_bin} into guest
 copy Swift dispatchMain TaskGroup yield probe ${swift_dispatchmain_taskgroup_yield_bin} into guest
 copy Swift dispatchMain TaskGroup one-sleep probe ${swift_dispatchmain_taskgroup_onesleep_bin} into guest
 copy Swift dispatchMain TaskGroup sleep probe ${swift_dispatchmain_taskgroup_sleep_bin} into guest
@@ -195,11 +225,46 @@ copy staged libdispatch runtime from ${dispatch_stage_dir}
 copy staged Swift runtime from ${swift_stage_dir}
 copy stock toolchain Dispatch runtime from ${swift_stock_dispatch_stage_dir}
 write Swift probe profile ${swift_probe_profile}
+write dispatch probe filter ${dispatch_probe_filter}
 write Swift probe filter ${swift_probe_filter}
 install one-shot twqprobe rc script
 enable serial console loader settings
 EOF
   exit 0
+fi
+
+if [ -n "$prepare_libthr_stage" ] || [ ! -f "$pthread_stage_dir/libthr.so.3" ]; then
+  prepare_runtime_stage "libthr" \
+    "${repo_root}/scripts/libthr/prepare-stage.sh" \
+    TWQ_LIBPTHREAD_STAGE_DIR="$pthread_stage_dir"
+fi
+
+if [ -n "$prepare_libdispatch_stage" ] ||
+   [ ! -f "$dispatch_stage_dir/libdispatch.so" ] ||
+   [ ! -f "$dispatch_stage_dir/libBlocksRuntime.so" ]; then
+  prepare_runtime_stage "libdispatch" \
+    "${repo_root}/scripts/libdispatch/prepare-stage.sh" \
+    TWQ_LIBPTHREAD_STAGE_DIR="$pthread_stage_dir" \
+    TWQ_LIBDISPATCH_STAGE_DIR="$dispatch_stage_dir"
+fi
+
+if [ -n "$prepare_swift_stage" ] ||
+   [ -n "$swift_concurrency_override_so" ] ||
+   [ ! -f "$swift_stage_dir/usr/lib/swift/freebsd/libswiftCore.so" ] ||
+   [ ! -f "$swift_stock_dispatch_stage_dir/libdispatch.so" ] ||
+   [ ! -f "$swift_stock_dispatch_stage_dir/libBlocksRuntime.so" ]; then
+  if [ -n "$swift_concurrency_override_so" ]; then
+    prepare_runtime_stage "swift" \
+      "${repo_root}/scripts/swift/prepare-stage.sh" \
+      TWQ_SWIFT_STAGE_DIR="$swift_stage_dir" \
+      TWQ_SWIFT_STOCK_DISPATCH_STAGE_DIR="$swift_stock_dispatch_stage_dir" \
+      TWQ_SWIFT_CONCURRENCY_OVERRIDE_SO="$swift_concurrency_override_so"
+  else
+    prepare_runtime_stage "swift" \
+      "${repo_root}/scripts/swift/prepare-stage.sh" \
+      TWQ_SWIFT_STAGE_DIR="$swift_stage_dir" \
+      TWQ_SWIFT_STOCK_DISPATCH_STAGE_DIR="$swift_stock_dispatch_stage_dir"
+  fi
 fi
 
 if [ ! -f "$vm_image" ]; then
@@ -309,6 +374,11 @@ fi
 
 if [ ! -x "$swift_dispatchmain_taskhandles_after_bin" ]; then
   echo "Swift dispatchMain Task-handles after probe binary not found or not executable: $swift_dispatchmain_taskhandles_after_bin" >&2
+  exit 66
+fi
+
+if [ ! -x "$swift_dispatchmain_taskhandles_after_repeat_bin" ]; then
+  echo "Swift dispatchMain repeated Task-handles after probe binary not found or not executable: $swift_dispatchmain_taskhandles_after_repeat_bin" >&2
   exit 66
 fi
 
@@ -462,6 +532,7 @@ doas install -m 755 "$swift_dispatchmain_sleep_bin" "$guest_root/root/twq-swift-
 doas install -m 755 "$swift_dispatchmain_taskgroup_bin" "$guest_root/root/twq-swift-dispatchmain-taskgroup"
 doas install -m 755 "$swift_dispatchmain_taskgroup_after_bin" "$guest_root/root/twq-swift-dispatchmain-taskgroup-after"
 doas install -m 755 "$swift_dispatchmain_taskhandles_after_bin" "$guest_root/root/twq-swift-dispatchmain-taskhandles-after"
+doas install -m 755 "$swift_dispatchmain_taskhandles_after_repeat_bin" "$guest_root/root/twq-swift-dispatchmain-taskhandles-after-repeat"
 doas install -m 755 "$swift_dispatchmain_taskgroup_yield_bin" "$guest_root/root/twq-swift-dispatchmain-taskgroup-yield"
 doas install -m 755 "$swift_dispatchmain_taskgroup_onesleep_bin" "$guest_root/root/twq-swift-dispatchmain-taskgroup-onesleep"
 doas install -m 755 "$swift_dispatchmain_taskgroup_sleep_bin" "$guest_root/root/twq-swift-dispatchmain-taskgroup-sleep"
@@ -478,6 +549,8 @@ doas install -m 755 "$swift_taskgroup_immediate_bin" "$guest_root/root/twq-swift
 doas install -m 755 "$swift_taskgroup_yield_bin" "$guest_root/root/twq-swift-taskgroup-yield"
 doas install -m 755 "$swift_taskgroup_probe_bin" "$guest_root/root/twq-swift-taskgroup-precheck"
 doas install -m 755 "$swift_dispatch_probe_bin" "$guest_root/root/twq-swift-dispatch-control"
+doas install -d -m 755 "$guest_root/root/twq-swift-hooks"
+doas install -m 755 "$swift_concurrency_hook_trace_so" "$guest_root/root/twq-swift-hooks/libtwq-swift-concurrency-hooks.so"
 doas rm -rf "$guest_root/root/twq-lib"
 doas mkdir -p "$guest_root/root/twq-lib"
 doas cp -a "$pthread_stage_dir/." "$guest_root/root/twq-lib/"
@@ -491,7 +564,9 @@ doas rm -rf "$guest_root/root/twq-stock-dispatch"
 doas mkdir -p "$guest_root/root/twq-stock-dispatch"
 doas cp -a "$swift_stock_dispatch_stage_dir/." "$guest_root/root/twq-stock-dispatch/"
 printf '%s\n' "$swift_probe_profile" | doas tee "$guest_root/root/twq-swift-profile" >/dev/null
+printf '%s\n' "$dispatch_probe_filter" | doas tee "$guest_root/root/twq-dispatch-filter" >/dev/null
 printf '%s\n' "$swift_probe_filter" | doas tee "$guest_root/root/twq-swift-filter" >/dev/null
+printf '%s\n' "$swift_runtime_trace" | doas tee "$guest_root/root/twq-swift-runtime-trace" >/dev/null
 
 tmp_run=$(mktemp)
 cat > "$tmp_run" <<'EOF'
@@ -550,15 +625,65 @@ if [ -r /root/twq-swift-profile ]; then
   swift_probe_profile=$(cat /root/twq-swift-profile)
 fi
 
+dispatch_probe_filter=
+if [ -r /root/twq-dispatch-filter ]; then
+  dispatch_probe_filter=$(cat /root/twq-dispatch-filter)
+fi
+
 swift_probe_filter=
 if [ -r /root/twq-swift-filter ]; then
   swift_probe_filter=$(cat /root/twq-swift-filter)
 fi
 
+swift_runtime_trace=
+if [ -r /root/twq-swift-runtime-trace ]; then
+  swift_runtime_trace=$(cat /root/twq-swift-runtime-trace)
+fi
+
 swift_runtime_root=/root/twq-swift/usr/lib/swift/freebsd
 swift_twq_ld=/root/twq-dispatch:${swift_runtime_root}:/root/twq-lib
+swift_twq_stockthr_ld=/root/twq-dispatch:${swift_runtime_root}
 swift_stock_dispatch_ld=/root/twq-stock-dispatch:${swift_runtime_root}
 swift_stock_dispatch_customthr_ld=/root/twq-stock-dispatch:${swift_runtime_root}:/root/twq-lib
+
+swift_trace_env()
+{
+  if [ -n "${swift_runtime_trace}" ]; then
+    env SWIFT_TWQ_TRACE_CONCURRENCY="${swift_runtime_trace}" \
+      LIBDISPATCH_TWQ_TRACE_MAINQUEUE="${swift_runtime_trace}" \
+      LIBPTHREAD_TWQ_TRACE="${swift_runtime_trace}" "$@"
+  else
+    "$@"
+  fi
+}
+
+dispatch_trace_env()
+{
+  if [ -n "${swift_runtime_trace}" ]; then
+    env LIBDISPATCH_TWQ_TRACE_MAINQUEUE="${swift_runtime_trace}" \
+      LIBPTHREAD_TWQ_TRACE="${swift_runtime_trace}" "$@"
+  else
+    "$@"
+  fi
+}
+
+dispatch_probe_selected()
+{
+  probe_mode=$1
+
+  if [ -z "${dispatch_probe_filter}" ]; then
+    return 0
+  fi
+
+  case ",${dispatch_probe_filter}," in
+    *,"${probe_mode}",*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
 
 swift_profile_runs_diagnostics()
 {
@@ -625,6 +750,13 @@ log=/var/log/twq-probe.log
     echo "<none>"
   fi
   echo "=== twq swift filter end ==="
+  echo "=== twq dispatch filter ==="
+  if [ -n "${dispatch_probe_filter}" ]; then
+    echo "${dispatch_probe_filter}"
+  else
+    echo "<none>"
+  fi
+  echo "=== twq dispatch filter end ==="
   sysctl kern.twq.busy_window_usecs=50000
   /root/twq-probe-stub --sequence basic --count 2
   /root/twq-probe-stub --sequence pressure
@@ -676,241 +808,375 @@ log=/var/log/twq-probe.log
   if [ "${workqueue_timeout_rc}" -ne 0 ]; then
     exit "${workqueue_timeout_rc}"
   fi
-  echo "=== twq dispatch basic stats before ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count
-  echo "=== twq dispatch basic stats before end ==="
-  echo "=== twq dispatch basic probe start ==="
-  env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode basic --tasks 8 --sleep-ms 40 --timeout-ms 5000
-  echo "=== twq dispatch basic probe end ==="
-  echo "=== twq dispatch basic stats after ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count
-  echo "=== twq dispatch basic stats after end ==="
-  echo "=== twq dispatch pressure stats before ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.switch_block_count \
-    kern.twq.switch_unblock_count \
-    kern.twq.bucket_req_total \
-    kern.twq.bucket_admit_total \
-    kern.twq.bucket_switch_block_total \
-    kern.twq.bucket_switch_unblock_total
-  echo "=== twq dispatch pressure stats before end ==="
-  echo "=== twq dispatch pressure probe start ==="
-  env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode pressure --tasks 8 --sleep-ms 40 --high-tasks 1 --high-sleep-ms 200 --timeout-ms 5000
-  echo "=== twq dispatch pressure probe end ==="
-  echo "=== twq dispatch pressure stats after ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.switch_block_count \
-    kern.twq.switch_unblock_count \
-    kern.twq.bucket_req_total \
-    kern.twq.bucket_admit_total \
-    kern.twq.bucket_switch_block_total \
-    kern.twq.bucket_switch_unblock_total
-  echo "=== twq dispatch pressure stats after end ==="
-  echo "=== twq dispatch burst stats before ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count \
-    kern.twq.should_narrow_true_count \
-    kern.twq.bucket_req_total \
-    kern.twq.bucket_admit_total \
-    kern.twq.bucket_total_current \
-    kern.twq.bucket_idle_current \
-    kern.twq.bucket_active_current
-  echo "=== twq dispatch burst stats before end ==="
-  echo "=== twq dispatch burst probe start ==="
-  burst_rc=0
-  env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode burst-reuse --tasks 24 --rounds 4 --sleep-ms 40 --pause-ms 300 --settle-ms 6500 --timeout-ms 5000 || burst_rc=$?
-  echo "=== twq dispatch burst probe end ==="
-  echo "=== twq dispatch burst stats after ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count \
-    kern.twq.should_narrow_true_count \
-    kern.twq.bucket_req_total \
-    kern.twq.bucket_admit_total \
-    kern.twq.bucket_total_current \
-    kern.twq.bucket_idle_current \
-    kern.twq.bucket_active_current
-  echo "=== twq dispatch burst stats after end ==="
-  if [ "${burst_rc}" -ne 0 ]; then
-    exit "${burst_rc}"
+  if dispatch_probe_selected "basic"; then
+    echo "=== twq dispatch basic stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count
+    echo "=== twq dispatch basic stats before end ==="
+    echo "=== twq dispatch basic probe start ==="
+    dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode basic --tasks 8 --sleep-ms 40 --timeout-ms 5000
+    echo "=== twq dispatch basic probe end ==="
+    echo "=== twq dispatch basic stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count
+    echo "=== twq dispatch basic stats after end ==="
   fi
-  echo "=== twq dispatch timeout-gap stats before ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count \
-    kern.twq.should_narrow_true_count \
-    kern.twq.bucket_req_total \
-    kern.twq.bucket_admit_total \
-    kern.twq.bucket_total_current \
-    kern.twq.bucket_idle_current \
-    kern.twq.bucket_active_current
-  echo "=== twq dispatch timeout-gap stats before end ==="
-  echo "=== twq dispatch timeout-gap probe start ==="
-  timeout_gap_rc=0
-  env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode timeout-gap --tasks 24 --rounds 2 --sleep-ms 40 --pause-ms 8000 --settle-ms 6500 --timeout-ms 5000 || timeout_gap_rc=$?
-  echo "=== twq dispatch timeout-gap probe end ==="
-  echo "=== twq dispatch timeout-gap stats after ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count \
-    kern.twq.should_narrow_true_count \
-    kern.twq.bucket_req_total \
-    kern.twq.bucket_admit_total \
-    kern.twq.bucket_total_current \
-    kern.twq.bucket_idle_current \
-    kern.twq.bucket_active_current
-  echo "=== twq dispatch timeout-gap stats after end ==="
-  if [ "${timeout_gap_rc}" -ne 0 ]; then
-    exit "${timeout_gap_rc}"
+  if dispatch_probe_selected "pressure"; then
+    echo "=== twq dispatch pressure stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.switch_block_count \
+      kern.twq.switch_unblock_count \
+      kern.twq.bucket_req_total \
+      kern.twq.bucket_admit_total \
+      kern.twq.bucket_switch_block_total \
+      kern.twq.bucket_switch_unblock_total
+    echo "=== twq dispatch pressure stats before end ==="
+    echo "=== twq dispatch pressure probe start ==="
+    dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode pressure --tasks 8 --sleep-ms 40 --high-tasks 1 --high-sleep-ms 200 --timeout-ms 5000
+    echo "=== twq dispatch pressure probe end ==="
+    echo "=== twq dispatch pressure stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.switch_block_count \
+      kern.twq.switch_unblock_count \
+      kern.twq.bucket_req_total \
+      kern.twq.bucket_admit_total \
+      kern.twq.bucket_switch_block_total \
+      kern.twq.bucket_switch_unblock_total
+    echo "=== twq dispatch pressure stats after end ==="
   fi
-  echo "=== twq dispatch sustained stats before ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count \
-    kern.twq.should_narrow_true_count \
-    kern.twq.switch_block_count \
-    kern.twq.switch_unblock_count \
-    kern.twq.bucket_req_total \
-    kern.twq.bucket_admit_total \
-    kern.twq.bucket_switch_block_total \
-    kern.twq.bucket_switch_unblock_total \
-    kern.twq.bucket_total_current \
-    kern.twq.bucket_idle_current \
-    kern.twq.bucket_active_current
-  echo "=== twq dispatch sustained stats before end ==="
-  echo "=== twq dispatch sustained probe start ==="
-  sustained_rc=0
-  env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode sustained --tasks 640 --high-tasks 1 --sleep-ms 40 --high-sleep-ms 200 --sample-ms 100 --settle-ms 6500 --timeout-ms 25000 || sustained_rc=$?
-  echo "=== twq dispatch sustained probe end ==="
-  echo "=== twq dispatch sustained stats after ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count \
-    kern.twq.should_narrow_true_count \
-    kern.twq.switch_block_count \
-    kern.twq.switch_unblock_count \
-    kern.twq.bucket_req_total \
-    kern.twq.bucket_admit_total \
-    kern.twq.bucket_switch_block_total \
-    kern.twq.bucket_switch_unblock_total \
-    kern.twq.bucket_total_current \
-    kern.twq.bucket_idle_current \
-    kern.twq.bucket_active_current
-  echo "=== twq dispatch sustained stats after end ==="
-  if [ "${sustained_rc}" -ne 0 ]; then
-    exit "${sustained_rc}"
+  if dispatch_probe_selected "burst-reuse"; then
+    echo "=== twq dispatch burst stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count \
+      kern.twq.should_narrow_true_count \
+      kern.twq.bucket_req_total \
+      kern.twq.bucket_admit_total \
+      kern.twq.bucket_total_current \
+      kern.twq.bucket_idle_current \
+      kern.twq.bucket_active_current
+    echo "=== twq dispatch burst stats before end ==="
+    echo "=== twq dispatch burst probe start ==="
+    burst_rc=0
+    dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode burst-reuse --tasks 24 --rounds 4 --sleep-ms 40 --pause-ms 300 --settle-ms 6500 --timeout-ms 5000 || burst_rc=$?
+    echo "=== twq dispatch burst probe end ==="
+    echo "=== twq dispatch burst stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count \
+      kern.twq.should_narrow_true_count \
+      kern.twq.bucket_req_total \
+      kern.twq.bucket_admit_total \
+      kern.twq.bucket_total_current \
+      kern.twq.bucket_idle_current \
+      kern.twq.bucket_active_current
+    echo "=== twq dispatch burst stats after end ==="
+    if [ "${burst_rc}" -ne 0 ]; then
+      exit "${burst_rc}"
+    fi
+  fi
+  if dispatch_probe_selected "timeout-gap"; then
+    echo "=== twq dispatch timeout-gap stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count \
+      kern.twq.should_narrow_true_count \
+      kern.twq.bucket_req_total \
+      kern.twq.bucket_admit_total \
+      kern.twq.bucket_total_current \
+      kern.twq.bucket_idle_current \
+      kern.twq.bucket_active_current
+    echo "=== twq dispatch timeout-gap stats before end ==="
+    echo "=== twq dispatch timeout-gap probe start ==="
+    timeout_gap_rc=0
+    dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode timeout-gap --tasks 24 --rounds 2 --sleep-ms 40 --pause-ms 8000 --settle-ms 6500 --timeout-ms 5000 || timeout_gap_rc=$?
+    echo "=== twq dispatch timeout-gap probe end ==="
+    echo "=== twq dispatch timeout-gap stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count \
+      kern.twq.should_narrow_true_count \
+      kern.twq.bucket_req_total \
+      kern.twq.bucket_admit_total \
+      kern.twq.bucket_total_current \
+      kern.twq.bucket_idle_current \
+      kern.twq.bucket_active_current
+    echo "=== twq dispatch timeout-gap stats after end ==="
+    if [ "${timeout_gap_rc}" -ne 0 ]; then
+      exit "${timeout_gap_rc}"
+    fi
+  fi
+  if dispatch_probe_selected "sustained"; then
+    echo "=== twq dispatch sustained stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count \
+      kern.twq.should_narrow_true_count \
+      kern.twq.switch_block_count \
+      kern.twq.switch_unblock_count \
+      kern.twq.bucket_req_total \
+      kern.twq.bucket_admit_total \
+      kern.twq.bucket_switch_block_total \
+      kern.twq.bucket_switch_unblock_total \
+      kern.twq.bucket_total_current \
+      kern.twq.bucket_idle_current \
+      kern.twq.bucket_active_current
+    echo "=== twq dispatch sustained stats before end ==="
+    echo "=== twq dispatch sustained probe start ==="
+    sustained_rc=0
+    dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode sustained --tasks 640 --high-tasks 1 --sleep-ms 40 --high-sleep-ms 200 --sample-ms 100 --settle-ms 6500 --timeout-ms 25000 || sustained_rc=$?
+    echo "=== twq dispatch sustained probe end ==="
+    echo "=== twq dispatch sustained stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count \
+      kern.twq.should_narrow_true_count \
+      kern.twq.switch_block_count \
+      kern.twq.switch_unblock_count \
+      kern.twq.bucket_req_total \
+      kern.twq.bucket_admit_total \
+      kern.twq.bucket_switch_block_total \
+      kern.twq.bucket_switch_unblock_total \
+      kern.twq.bucket_total_current \
+      kern.twq.bucket_idle_current \
+      kern.twq.bucket_active_current
+    echo "=== twq dispatch sustained stats after end ==="
+    if [ "${sustained_rc}" -ne 0 ]; then
+      exit "${sustained_rc}"
+    fi
   fi
   probe_failure_rc=0
-  echo "=== twq dispatch after stats before ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count
-  echo "=== twq dispatch after stats before end ==="
-  echo "=== twq dispatch after probe start ==="
-  dispatch_after_rc=0
-  env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode after --tasks 8 --sleep-ms 40 --timeout-ms 5000 || dispatch_after_rc=$?
-  echo "=== twq dispatch after probe end ==="
-  echo "=== twq dispatch after stats after ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count
-  echo "=== twq dispatch after stats after end ==="
-  if [ "${dispatch_after_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
-    probe_failure_rc=${dispatch_after_rc}
+  if dispatch_probe_selected "after"; then
+    echo "=== twq dispatch after stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch after stats before end ==="
+    echo "=== twq dispatch after probe start ==="
+    dispatch_after_rc=0
+    dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode after --tasks 8 --sleep-ms 40 --timeout-ms 5000 || dispatch_after_rc=$?
+    echo "=== twq dispatch after probe end ==="
+    echo "=== twq dispatch after stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch after stats after end ==="
+    if [ "${dispatch_after_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+      probe_failure_rc=${dispatch_after_rc}
+    fi
   fi
-  echo "=== twq dispatch executor stats before ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count
-  echo "=== twq dispatch executor stats before end ==="
-  echo "=== twq dispatch executor probe start ==="
-  dispatch_executor_rc=0
-  env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode executor --tasks 8 --sleep-ms 20 --timeout-ms 5000 || dispatch_executor_rc=$?
-  echo "=== twq dispatch executor probe end ==="
-  echo "=== twq dispatch executor stats after ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count
-  echo "=== twq dispatch executor stats after end ==="
-  if [ "${dispatch_executor_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
-    probe_failure_rc=${dispatch_executor_rc}
+  if dispatch_probe_selected "executor"; then
+    echo "=== twq dispatch executor stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch executor stats before end ==="
+    echo "=== twq dispatch executor probe start ==="
+    dispatch_executor_rc=0
+    dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode executor --tasks 8 --sleep-ms 20 --timeout-ms 5000 || dispatch_executor_rc=$?
+    echo "=== twq dispatch executor probe end ==="
+    echo "=== twq dispatch executor stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch executor stats after end ==="
+    if [ "${dispatch_executor_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+      probe_failure_rc=${dispatch_executor_rc}
+    fi
   fi
-  echo "=== twq dispatch executor-after stats before ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count
-  echo "=== twq dispatch executor-after stats before end ==="
-  echo "=== twq dispatch executor-after probe start ==="
-  dispatch_executor_after_rc=0
-  env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode executor-after --tasks 8 --sleep-ms 40 --timeout-ms 5000 || dispatch_executor_after_rc=$?
-  echo "=== twq dispatch executor-after probe end ==="
-  echo "=== twq dispatch executor-after stats after ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count
-  echo "=== twq dispatch executor-after stats after end ==="
-  if [ "${dispatch_executor_after_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
-    probe_failure_rc=${dispatch_executor_after_rc}
+  if dispatch_probe_selected "executor-after"; then
+    echo "=== twq dispatch executor-after stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch executor-after stats before end ==="
+    echo "=== twq dispatch executor-after probe start ==="
+    dispatch_executor_after_rc=0
+    dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode executor-after --tasks 8 --sleep-ms 40 --timeout-ms 5000 || dispatch_executor_after_rc=$?
+    echo "=== twq dispatch executor-after probe end ==="
+    echo "=== twq dispatch executor-after stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch executor-after stats after end ==="
+    if [ "${dispatch_executor_after_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+      probe_failure_rc=${dispatch_executor_after_rc}
+    fi
   fi
-  echo "=== twq dispatch executor-after-settled stats before ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count
-  echo "=== twq dispatch executor-after-settled stats before end ==="
-  echo "=== twq dispatch executor-after-settled probe start ==="
-  dispatch_executor_after_settled_rc=0
-  env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode executor-after-settled --tasks 8 --sleep-ms 40 --timeout-ms 5000 || dispatch_executor_after_settled_rc=$?
-  echo "=== twq dispatch executor-after-settled probe end ==="
-  echo "=== twq dispatch executor-after-settled stats after ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count
-  echo "=== twq dispatch executor-after-settled stats after end ==="
-  if [ "${dispatch_executor_after_settled_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
-    probe_failure_rc=${dispatch_executor_after_settled_rc}
+  if dispatch_probe_selected "executor-after-settled"; then
+    echo "=== twq dispatch executor-after-settled stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch executor-after-settled stats before end ==="
+    echo "=== twq dispatch executor-after-settled probe start ==="
+    dispatch_executor_after_settled_rc=0
+    dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode executor-after-settled --tasks 8 --sleep-ms 40 --timeout-ms 5000 || dispatch_executor_after_settled_rc=$?
+    echo "=== twq dispatch executor-after-settled probe end ==="
+    echo "=== twq dispatch executor-after-settled stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch executor-after-settled stats after end ==="
+    if [ "${dispatch_executor_after_settled_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+      probe_failure_rc=${dispatch_executor_after_settled_rc}
+    fi
   fi
-  if swift_run_full_unfiltered_diagnostics; then
+  if dispatch_probe_selected "main-executor-after-repeat"; then
+    echo "=== twq dispatch main-executor-after-repeat stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count \
+      kern.twq.bucket_total_current \
+      kern.twq.bucket_idle_current \
+      kern.twq.bucket_active_current
+    echo "=== twq dispatch main-executor-after-repeat stats before end ==="
+    echo "=== twq dispatch main-executor-after-repeat probe start ==="
+    dispatch_main_executor_after_repeat_rc=0
+    run_with_timeout 45 dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode main-executor-after-repeat --rounds 64 --tasks 8 --sleep-ms 20
+    dispatch_main_executor_after_repeat_rc=${RUN_WITH_TIMEOUT_STATUS}
+    if [ "${dispatch_main_executor_after_repeat_rc}" -eq 124 ]; then
+      echo '{"kind":"dispatch-probe","status":"timeout","data":{"mode":"main-executor-after-repeat","timed_out":true,"timeout_sec":45},"meta":{"component":"c","binary":"twq-dispatch-probe"}}'
+    elif [ "${dispatch_main_executor_after_repeat_rc}" -ne 0 ]; then
+      echo "{\"kind\":\"dispatch-probe\",\"status\":\"error\",\"data\":{\"mode\":\"main-executor-after-repeat\",\"timed_out\":false,\"rc\":${dispatch_main_executor_after_repeat_rc}},\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}"
+    fi
+    echo "=== twq dispatch main-executor-after-repeat probe end ==="
+    echo "=== twq dispatch main-executor-after-repeat stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count \
+      kern.twq.bucket_total_current \
+      kern.twq.bucket_idle_current \
+      kern.twq.bucket_active_current
+    echo "=== twq dispatch main-executor-after-repeat stats after end ==="
+    if [ "${dispatch_main_executor_after_repeat_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+      probe_failure_rc=${dispatch_main_executor_after_repeat_rc}
+    fi
+  fi
+  if dispatch_probe_selected "main-executor-resume-repeat"; then
+    echo "=== twq dispatch main-executor-resume-repeat stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count \
+      kern.twq.bucket_total_current \
+      kern.twq.bucket_idle_current \
+      kern.twq.bucket_active_current
+    echo "=== twq dispatch main-executor-resume-repeat stats before end ==="
+    echo "=== twq dispatch main-executor-resume-repeat probe start ==="
+    dispatch_main_executor_resume_repeat_rc=0
+    run_with_timeout 45 dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode main-executor-resume-repeat --rounds 64 --tasks 8 --sleep-ms 20
+    dispatch_main_executor_resume_repeat_rc=${RUN_WITH_TIMEOUT_STATUS}
+    if [ "${dispatch_main_executor_resume_repeat_rc}" -eq 124 ]; then
+      echo '{"kind":"dispatch-probe","status":"timeout","data":{"mode":"main-executor-resume-repeat","timed_out":true,"timeout_sec":45},"meta":{"component":"c","binary":"twq-dispatch-probe"}}'
+    elif [ "${dispatch_main_executor_resume_repeat_rc}" -ne 0 ]; then
+      echo "{\"kind\":\"dispatch-probe\",\"status\":\"error\",\"data\":{\"mode\":\"main-executor-resume-repeat\",\"timed_out\":false,\"rc\":${dispatch_main_executor_resume_repeat_rc}},\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}"
+    fi
+    echo "=== twq dispatch main-executor-resume-repeat probe end ==="
+    echo "=== twq dispatch main-executor-resume-repeat stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count \
+      kern.twq.bucket_total_current \
+      kern.twq.bucket_idle_current \
+      kern.twq.bucket_active_current
+    echo "=== twq dispatch main-executor-resume-repeat stats after end ==="
+    if [ "${dispatch_main_executor_resume_repeat_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+      probe_failure_rc=${dispatch_main_executor_resume_repeat_rc}
+    fi
+  fi
+  if swift_run_full_unfiltered_diagnostics && dispatch_probe_selected "executor-after-default-width"; then
+  echo "=== twq dispatch executor-after-default-width stats before ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq dispatch executor-after-default-width stats before end ==="
+  echo "=== twq dispatch executor-after-default-width probe start ==="
+  dispatch_executor_after_default_width_rc=0
+  dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode executor-after-default-width --tasks 8 --sleep-ms 40 --timeout-ms 5000 || dispatch_executor_after_default_width_rc=$?
+  echo "=== twq dispatch executor-after-default-width probe end ==="
+  echo "=== twq dispatch executor-after-default-width stats after ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq dispatch executor-after-default-width stats after end ==="
+  if [ "${dispatch_executor_after_default_width_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+    probe_failure_rc=${dispatch_executor_after_default_width_rc}
+  fi
+  fi
+  if swift_run_full_unfiltered_diagnostics && dispatch_probe_selected "executor-after-sync-width"; then
+  echo "=== twq dispatch executor-after-sync-width stats before ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq dispatch executor-after-sync-width stats before end ==="
+  echo "=== twq dispatch executor-after-sync-width probe start ==="
+  dispatch_executor_after_sync_width_rc=0
+  dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode executor-after-sync-width --tasks 8 --sleep-ms 40 --timeout-ms 5000 || dispatch_executor_after_sync_width_rc=$?
+  echo "=== twq dispatch executor-after-sync-width probe end ==="
+  echo "=== twq dispatch executor-after-sync-width stats after ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq dispatch executor-after-sync-width stats after end ==="
+  if [ "${dispatch_executor_after_sync_width_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+    probe_failure_rc=${dispatch_executor_after_sync_width_rc}
+  fi
+  fi
+  if swift_run_full_unfiltered_diagnostics && dispatch_probe_selected "worker-after-group"; then
   echo "=== twq dispatch worker-after-group stats before ==="
   sysctl kern.twq.init_count \
     kern.twq.setup_dispatch_count \
@@ -920,7 +1186,7 @@ log=/var/log/twq-probe.log
   echo "=== twq dispatch worker-after-group stats before end ==="
   echo "=== twq dispatch worker-after-group probe start ==="
   dispatch_worker_after_group_rc=0
-  env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode worker-after-group --tasks 8 --sleep-ms 40 --timeout-ms 5000 || dispatch_worker_after_group_rc=$?
+  dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode worker-after-group --tasks 8 --sleep-ms 40 --timeout-ms 5000 || dispatch_worker_after_group_rc=$?
   echo "=== twq dispatch worker-after-group probe end ==="
   echo "=== twq dispatch worker-after-group stats after ==="
   sysctl kern.twq.init_count \
@@ -933,57 +1199,117 @@ log=/var/log/twq-probe.log
     probe_failure_rc=${dispatch_worker_after_group_rc}
   fi
   fi
-  echo "=== twq dispatch main stats before ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count
-  echo "=== twq dispatch main stats before end ==="
-  echo "=== twq dispatch main probe start ==="
-  dispatch_main_rc=0
-  run_with_timeout 15 env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode main --tasks 4
-  dispatch_main_rc=${RUN_WITH_TIMEOUT_STATUS}
-  if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
-    echo '{"kind":"dispatch-probe","status":"timeout","data":{"mode":"main","timed_out":true,"timeout_sec":15},"meta":{"component":"c","binary":"twq-dispatch-probe"}}'
-    dispatch_main_rc=124
+  if dispatch_probe_selected "main"; then
+    echo "=== twq dispatch main stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch main stats before end ==="
+    echo "=== twq dispatch main probe start ==="
+    dispatch_main_rc=0
+    run_with_timeout 15 dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode main --tasks 4
+    dispatch_main_rc=${RUN_WITH_TIMEOUT_STATUS}
+    if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
+      echo '{"kind":"dispatch-probe","status":"timeout","data":{"mode":"main","timed_out":true,"timeout_sec":15},"meta":{"component":"c","binary":"twq-dispatch-probe"}}'
+      dispatch_main_rc=124
+    fi
+    echo "=== twq dispatch main probe end ==="
+    echo "=== twq dispatch main stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch main stats after end ==="
+    if [ "${dispatch_main_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+      probe_failure_rc=${dispatch_main_rc}
+    fi
   fi
-  echo "=== twq dispatch main probe end ==="
-  echo "=== twq dispatch main stats after ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count
-  echo "=== twq dispatch main stats after end ==="
-  if [ "${dispatch_main_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
-    probe_failure_rc=${dispatch_main_rc}
+  if dispatch_probe_selected "main-after"; then
+    echo "=== twq dispatch main-after stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch main-after stats before end ==="
+    echo "=== twq dispatch main-after probe start ==="
+    dispatch_main_after_rc=0
+    run_with_timeout 15 dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode main-after --tasks 4 --sleep-ms 40
+    dispatch_main_after_rc=${RUN_WITH_TIMEOUT_STATUS}
+    if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
+      echo '{"kind":"dispatch-probe","status":"timeout","data":{"mode":"main-after","timed_out":true,"timeout_sec":15},"meta":{"component":"c","binary":"twq-dispatch-probe"}}'
+      dispatch_main_after_rc=124
+    fi
+    echo "=== twq dispatch main-after probe end ==="
+    echo "=== twq dispatch main-after stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch main-after stats after end ==="
+    if [ "${dispatch_main_after_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+      probe_failure_rc=${dispatch_main_after_rc}
+    fi
   fi
-  echo "=== twq dispatch main-after stats before ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count
-  echo "=== twq dispatch main-after stats before end ==="
-  echo "=== twq dispatch main-after probe start ==="
-  dispatch_main_after_rc=0
-  run_with_timeout 15 env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode main-after --tasks 4 --sleep-ms 40
-  dispatch_main_after_rc=${RUN_WITH_TIMEOUT_STATUS}
-  if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
-    echo '{"kind":"dispatch-probe","status":"timeout","data":{"mode":"main-after","timed_out":true,"timeout_sec":15},"meta":{"component":"c","binary":"twq-dispatch-probe"}}'
-    dispatch_main_after_rc=124
+  if dispatch_probe_selected "main-roundtrip-after"; then
+    echo "=== twq dispatch main-roundtrip-after stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch main-roundtrip-after stats before end ==="
+    echo "=== twq dispatch main-roundtrip-after probe start ==="
+    dispatch_main_roundtrip_after_rc=0
+    run_with_timeout 15 dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode main-roundtrip-after --tasks 8 --sleep-ms 40
+    dispatch_main_roundtrip_after_rc=${RUN_WITH_TIMEOUT_STATUS}
+    if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
+      echo '{"kind":"dispatch-probe","status":"timeout","data":{"mode":"main-roundtrip-after","timed_out":true,"timeout_sec":15},"meta":{"component":"c","binary":"twq-dispatch-probe"}}'
+      dispatch_main_roundtrip_after_rc=124
+    fi
+    echo "=== twq dispatch main-roundtrip-after probe end ==="
+    echo "=== twq dispatch main-roundtrip-after stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch main-roundtrip-after stats after end ==="
+    if [ "${dispatch_main_roundtrip_after_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+      probe_failure_rc=${dispatch_main_roundtrip_after_rc}
+    fi
   fi
-  echo "=== twq dispatch main-after probe end ==="
-  echo "=== twq dispatch main-after stats after ==="
-  sysctl kern.twq.init_count \
-    kern.twq.setup_dispatch_count \
-    kern.twq.reqthreads_count \
-    kern.twq.thread_enter_count \
-    kern.twq.thread_return_count
-  echo "=== twq dispatch main-after stats after end ==="
-  if [ "${dispatch_main_after_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
-    probe_failure_rc=${dispatch_main_after_rc}
+  if dispatch_probe_selected "main-group-after"; then
+    echo "=== twq dispatch main-group-after stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch main-group-after stats before end ==="
+    echo "=== twq dispatch main-group-after probe start ==="
+    dispatch_main_group_after_rc=0
+    run_with_timeout 15 dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode main-group-after --tasks 8 --sleep-ms 40
+    dispatch_main_group_after_rc=${RUN_WITH_TIMEOUT_STATUS}
+    if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
+      echo '{"kind":"dispatch-probe","status":"timeout","data":{"mode":"main-group-after","timed_out":true,"timeout_sec":15},"meta":{"component":"c","binary":"twq-dispatch-probe"}}'
+      dispatch_main_group_after_rc=124
+    fi
+    echo "=== twq dispatch main-group-after probe end ==="
+    echo "=== twq dispatch main-group-after stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count
+    echo "=== twq dispatch main-group-after stats after end ==="
+    if [ "${dispatch_main_group_after_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+      probe_failure_rc=${dispatch_main_group_after_rc}
+    fi
   fi
   if swift_probe_should_run "async-smoke" validation; then
   echo "=== twq swift async smoke probe start ==="
@@ -1484,7 +1810,7 @@ log=/var/log/twq-probe.log
   swift_dispatchmain_spawnwait_after_rc=0
   RUN_WITH_TIMEOUT_LABEL=dispatchmain-spawnwait-after
   RUN_WITH_TIMEOUT_DIAGNOSTIC=1
-  run_with_timeout 15 env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-swift/usr/lib/swift/freebsd:/root/twq-lib /root/twq-swift-dispatchmain-spawnwait-after
+  run_with_timeout 15 swift_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-swift/usr/lib/swift/freebsd:/root/twq-lib /root/twq-swift-dispatchmain-spawnwait-after
   RUN_WITH_TIMEOUT_LABEL=
   RUN_WITH_TIMEOUT_DIAGNOSTIC=0
   swift_dispatchmain_spawnwait_after_rc=${RUN_WITH_TIMEOUT_STATUS}
@@ -1873,7 +2199,7 @@ log=/var/log/twq-probe.log
   swift_dispatchmain_taskhandles_after_rc=0
   RUN_WITH_TIMEOUT_LABEL=dispatchmain-taskhandles-after
   RUN_WITH_TIMEOUT_DIAGNOSTIC=1
-  run_with_timeout 15 env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-swift/usr/lib/swift/freebsd:/root/twq-lib /root/twq-swift-dispatchmain-taskhandles-after
+  run_with_timeout 15 swift_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-swift/usr/lib/swift/freebsd:/root/twq-lib /root/twq-swift-dispatchmain-taskhandles-after
   RUN_WITH_TIMEOUT_LABEL=
   RUN_WITH_TIMEOUT_DIAGNOSTIC=0
   swift_dispatchmain_taskhandles_after_rc=${RUN_WITH_TIMEOUT_STATUS}
@@ -1888,6 +2214,222 @@ log=/var/log/twq-probe.log
     probe_failure_rc=${swift_dispatchmain_taskhandles_after_rc}
   fi
   fi
+  if swift_probe_should_run "dispatchmain-taskhandles-after-stockdispatch" diagnostic; then
+  echo "=== twq swift dispatchmain taskhandles after stockdispatch probe start ==="
+  swift_dispatchmain_taskhandles_after_stockdispatch_rc=0
+  RUN_WITH_TIMEOUT_LABEL=dispatchmain-taskhandles-after-stockdispatch
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=1
+  run_with_timeout 15 swift_trace_env env LD_LIBRARY_PATH=${swift_stock_dispatch_ld} /root/twq-swift-dispatchmain-taskhandles-after
+  RUN_WITH_TIMEOUT_LABEL=
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=0
+  swift_dispatchmain_taskhandles_after_stockdispatch_rc=${RUN_WITH_TIMEOUT_STATUS}
+  if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
+    echo '{"kind":"swift-probe","status":"timeout","data":{"mode":"dispatchmain-taskhandles-after-stockdispatch","timed_out":true,"timeout_sec":15},"meta":{"component":"swift","binary":"twq-swift-dispatchmain-taskhandles-after"}}'
+    swift_dispatchmain_taskhandles_after_stockdispatch_rc=124
+  elif [ "${swift_dispatchmain_taskhandles_after_stockdispatch_rc}" -ne 0 ]; then
+    echo "{\"kind\":\"swift-probe\",\"status\":\"error\",\"data\":{\"mode\":\"dispatchmain-taskhandles-after-stockdispatch\",\"timed_out\":false,\"rc\":${swift_dispatchmain_taskhandles_after_stockdispatch_rc}},\"meta\":{\"component\":\"swift\",\"binary\":\"twq-swift-dispatchmain-taskhandles-after\"}}"
+  fi
+  echo "=== twq swift dispatchmain taskhandles after stockdispatch probe end ==="
+  if [ "${swift_dispatchmain_taskhandles_after_stockdispatch_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+    probe_failure_rc=${swift_dispatchmain_taskhandles_after_stockdispatch_rc}
+  fi
+  fi
+  if swift_probe_should_run "dispatchmain-taskhandles-after-customdispatch-stockthr" diagnostic; then
+  echo "=== twq swift dispatchmain taskhandles after customdispatch stockthr probe start ==="
+  swift_dispatchmain_taskhandles_after_customdispatch_stockthr_rc=0
+  RUN_WITH_TIMEOUT_LABEL=dispatchmain-taskhandles-after-customdispatch-stockthr
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=1
+  run_with_timeout 15 swift_trace_env env LD_LIBRARY_PATH=${swift_twq_stockthr_ld} /root/twq-swift-dispatchmain-taskhandles-after
+  RUN_WITH_TIMEOUT_LABEL=
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=0
+  swift_dispatchmain_taskhandles_after_customdispatch_stockthr_rc=${RUN_WITH_TIMEOUT_STATUS}
+  if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
+    echo '{"kind":"swift-probe","status":"timeout","data":{"mode":"dispatchmain-taskhandles-after-customdispatch-stockthr","timed_out":true,"timeout_sec":15},"meta":{"component":"swift","binary":"twq-swift-dispatchmain-taskhandles-after"}}'
+    swift_dispatchmain_taskhandles_after_customdispatch_stockthr_rc=124
+  elif [ "${swift_dispatchmain_taskhandles_after_customdispatch_stockthr_rc}" -ne 0 ]; then
+    echo "{\"kind\":\"swift-probe\",\"status\":\"error\",\"data\":{\"mode\":\"dispatchmain-taskhandles-after-customdispatch-stockthr\",\"timed_out\":false,\"rc\":${swift_dispatchmain_taskhandles_after_customdispatch_stockthr_rc}},\"meta\":{\"component\":\"swift\",\"binary\":\"twq-swift-dispatchmain-taskhandles-after\"}}"
+  fi
+  echo "=== twq swift dispatchmain taskhandles after customdispatch stockthr probe end ==="
+  if [ "${swift_dispatchmain_taskhandles_after_customdispatch_stockthr_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+    probe_failure_rc=${swift_dispatchmain_taskhandles_after_customdispatch_stockthr_rc}
+  fi
+  fi
+  if swift_probe_should_run "dispatchmain-taskhandles-after-stockdispatch-customthr" diagnostic; then
+  echo "=== twq swift dispatchmain taskhandles after stockdispatch customthr stats before ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq swift dispatchmain taskhandles after stockdispatch customthr stats before end ==="
+  echo "=== twq swift dispatchmain taskhandles after stockdispatch customthr probe start ==="
+  swift_dispatchmain_taskhandles_after_stockdispatch_customthr_rc=0
+  RUN_WITH_TIMEOUT_LABEL=dispatchmain-taskhandles-after-stockdispatch-customthr
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=1
+  run_with_timeout 15 swift_trace_env env LD_LIBRARY_PATH=${swift_stock_dispatch_customthr_ld} /root/twq-swift-dispatchmain-taskhandles-after
+  RUN_WITH_TIMEOUT_LABEL=
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=0
+  swift_dispatchmain_taskhandles_after_stockdispatch_customthr_rc=${RUN_WITH_TIMEOUT_STATUS}
+  if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
+    echo '{"kind":"swift-probe","status":"timeout","data":{"mode":"dispatchmain-taskhandles-after-stockdispatch-customthr","timed_out":true,"timeout_sec":15},"meta":{"component":"swift","binary":"twq-swift-dispatchmain-taskhandles-after"}}'
+    swift_dispatchmain_taskhandles_after_stockdispatch_customthr_rc=124
+  elif [ "${swift_dispatchmain_taskhandles_after_stockdispatch_customthr_rc}" -ne 0 ]; then
+    echo "{\"kind\":\"swift-probe\",\"status\":\"error\",\"data\":{\"mode\":\"dispatchmain-taskhandles-after-stockdispatch-customthr\",\"timed_out\":false,\"rc\":${swift_dispatchmain_taskhandles_after_stockdispatch_customthr_rc}},\"meta\":{\"component\":\"swift\",\"binary\":\"twq-swift-dispatchmain-taskhandles-after\"}}"
+  fi
+  echo "=== twq swift dispatchmain taskhandles after stockdispatch customthr probe end ==="
+  echo "=== twq swift dispatchmain taskhandles after stockdispatch customthr stats after ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq swift dispatchmain taskhandles after stockdispatch customthr stats after end ==="
+  if [ "${swift_dispatchmain_taskhandles_after_stockdispatch_customthr_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+    probe_failure_rc=${swift_dispatchmain_taskhandles_after_stockdispatch_customthr_rc}
+  fi
+  fi
+  if swift_probe_should_run "dispatchmain-taskhandles-after-repeat" diagnostic; then
+  echo "=== twq swift dispatchmain taskhandles after repeat stats before ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq swift dispatchmain taskhandles after repeat stats before end ==="
+  echo "=== twq swift dispatchmain taskhandles after repeat probe start ==="
+  swift_dispatchmain_taskhandles_after_repeat_rc=0
+  RUN_WITH_TIMEOUT_LABEL=dispatchmain-taskhandles-after-repeat
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=1
+  run_with_timeout 45 swift_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-swift/usr/lib/swift/freebsd:/root/twq-lib TWQ_REPEAT_ROUNDS=64 TWQ_REPEAT_TASKS=8 TWQ_REPEAT_DELAY_MS=20 TWQ_REPEAT_DEBUG_FIRST_ROUND=1 /root/twq-swift-dispatchmain-taskhandles-after-repeat
+  RUN_WITH_TIMEOUT_LABEL=
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=0
+  swift_dispatchmain_taskhandles_after_repeat_rc=${RUN_WITH_TIMEOUT_STATUS}
+  if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
+    echo '{"kind":"swift-probe","status":"timeout","data":{"mode":"dispatchmain-taskhandles-after-repeat","timed_out":true,"timeout_sec":45},"meta":{"component":"swift","binary":"twq-swift-dispatchmain-taskhandles-after-repeat"}}'
+    swift_dispatchmain_taskhandles_after_repeat_rc=124
+  elif [ "${swift_dispatchmain_taskhandles_after_repeat_rc}" -ne 0 ]; then
+    echo "{\"kind\":\"swift-probe\",\"status\":\"error\",\"data\":{\"mode\":\"dispatchmain-taskhandles-after-repeat\",\"timed_out\":false,\"rc\":${swift_dispatchmain_taskhandles_after_repeat_rc}},\"meta\":{\"component\":\"swift\",\"binary\":\"twq-swift-dispatchmain-taskhandles-after-repeat\"}}"
+  fi
+  echo "=== twq swift dispatchmain taskhandles after repeat probe end ==="
+  echo "=== twq swift dispatchmain taskhandles after repeat stats after ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq swift dispatchmain taskhandles after repeat stats after end ==="
+  if [ "${swift_dispatchmain_taskhandles_after_repeat_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+    probe_failure_rc=${swift_dispatchmain_taskhandles_after_repeat_rc}
+  fi
+  fi
+  if swift_probe_should_run "dispatchmain-taskhandles-after-repeat-customdispatch-stockthr" diagnostic; then
+  echo "=== twq swift dispatchmain taskhandles after repeat customdispatch stockthr probe start ==="
+  swift_dispatchmain_taskhandles_after_repeat_customdispatch_stockthr_rc=0
+  RUN_WITH_TIMEOUT_LABEL=dispatchmain-taskhandles-after-repeat-customdispatch-stockthr
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=1
+  run_with_timeout 45 swift_trace_env env LD_LIBRARY_PATH=${swift_twq_stockthr_ld} TWQ_REPEAT_ROUNDS=64 TWQ_REPEAT_TASKS=8 TWQ_REPEAT_DELAY_MS=20 TWQ_REPEAT_DEBUG_FIRST_ROUND=1 /root/twq-swift-dispatchmain-taskhandles-after-repeat
+  RUN_WITH_TIMEOUT_LABEL=
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=0
+  swift_dispatchmain_taskhandles_after_repeat_customdispatch_stockthr_rc=${RUN_WITH_TIMEOUT_STATUS}
+  if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
+    echo '{"kind":"swift-probe","status":"timeout","data":{"mode":"dispatchmain-taskhandles-after-repeat-customdispatch-stockthr","timed_out":true,"timeout_sec":45},"meta":{"component":"swift","binary":"twq-swift-dispatchmain-taskhandles-after-repeat"}}'
+    swift_dispatchmain_taskhandles_after_repeat_customdispatch_stockthr_rc=124
+  elif [ "${swift_dispatchmain_taskhandles_after_repeat_customdispatch_stockthr_rc}" -ne 0 ]; then
+    echo "{\"kind\":\"swift-probe\",\"status\":\"error\",\"data\":{\"mode\":\"dispatchmain-taskhandles-after-repeat-customdispatch-stockthr\",\"timed_out\":false,\"rc\":${swift_dispatchmain_taskhandles_after_repeat_customdispatch_stockthr_rc}},\"meta\":{\"component\":\"swift\",\"binary\":\"twq-swift-dispatchmain-taskhandles-after-repeat\"}}"
+  fi
+  echo "=== twq swift dispatchmain taskhandles after repeat customdispatch stockthr probe end ==="
+  if [ "${swift_dispatchmain_taskhandles_after_repeat_customdispatch_stockthr_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+    probe_failure_rc=${swift_dispatchmain_taskhandles_after_repeat_customdispatch_stockthr_rc}
+  fi
+  fi
+  if swift_probe_should_run "dispatchmain-taskhandles-after-repeat-stockdispatch" diagnostic; then
+  echo "=== twq swift dispatchmain taskhandles after repeat stockdispatch probe start ==="
+  swift_dispatchmain_taskhandles_after_repeat_stockdispatch_rc=0
+  RUN_WITH_TIMEOUT_LABEL=dispatchmain-taskhandles-after-repeat-stockdispatch
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=1
+  run_with_timeout 45 swift_trace_env env LD_LIBRARY_PATH=${swift_stock_dispatch_ld} TWQ_REPEAT_ROUNDS=64 TWQ_REPEAT_TASKS=8 TWQ_REPEAT_DELAY_MS=20 TWQ_REPEAT_DEBUG_FIRST_ROUND=1 /root/twq-swift-dispatchmain-taskhandles-after-repeat
+  RUN_WITH_TIMEOUT_LABEL=
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=0
+  swift_dispatchmain_taskhandles_after_repeat_stockdispatch_rc=${RUN_WITH_TIMEOUT_STATUS}
+  if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
+    echo '{"kind":"swift-probe","status":"timeout","data":{"mode":"dispatchmain-taskhandles-after-repeat-stockdispatch","timed_out":true,"timeout_sec":45},"meta":{"component":"swift","binary":"twq-swift-dispatchmain-taskhandles-after-repeat"}}'
+    swift_dispatchmain_taskhandles_after_repeat_stockdispatch_rc=124
+  elif [ "${swift_dispatchmain_taskhandles_after_repeat_stockdispatch_rc}" -ne 0 ]; then
+    echo "{\"kind\":\"swift-probe\",\"status\":\"error\",\"data\":{\"mode\":\"dispatchmain-taskhandles-after-repeat-stockdispatch\",\"timed_out\":false,\"rc\":${swift_dispatchmain_taskhandles_after_repeat_stockdispatch_rc}},\"meta\":{\"component\":\"swift\",\"binary\":\"twq-swift-dispatchmain-taskhandles-after-repeat\"}}"
+  fi
+  echo "=== twq swift dispatchmain taskhandles after repeat stockdispatch probe end ==="
+  if [ "${swift_dispatchmain_taskhandles_after_repeat_stockdispatch_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+    probe_failure_rc=${swift_dispatchmain_taskhandles_after_repeat_stockdispatch_rc}
+  fi
+  fi
+  if swift_probe_should_run "dispatchmain-taskhandles-after-repeat-stockdispatch-customthr" diagnostic; then
+  echo "=== twq swift dispatchmain taskhandles after repeat stockdispatch customthr stats before ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq swift dispatchmain taskhandles after repeat stockdispatch customthr stats before end ==="
+  echo "=== twq swift dispatchmain taskhandles after repeat stockdispatch customthr probe start ==="
+  swift_dispatchmain_taskhandles_after_repeat_stockdispatch_customthr_rc=0
+  RUN_WITH_TIMEOUT_LABEL=dispatchmain-taskhandles-after-repeat-stockdispatch-customthr
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=1
+  run_with_timeout 45 swift_trace_env env LD_LIBRARY_PATH=${swift_stock_dispatch_customthr_ld} TWQ_REPEAT_ROUNDS=64 TWQ_REPEAT_TASKS=8 TWQ_REPEAT_DELAY_MS=20 TWQ_REPEAT_DEBUG_FIRST_ROUND=1 /root/twq-swift-dispatchmain-taskhandles-after-repeat
+  RUN_WITH_TIMEOUT_LABEL=
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=0
+  swift_dispatchmain_taskhandles_after_repeat_stockdispatch_customthr_rc=${RUN_WITH_TIMEOUT_STATUS}
+  if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
+    echo '{"kind":"swift-probe","status":"timeout","data":{"mode":"dispatchmain-taskhandles-after-repeat-stockdispatch-customthr","timed_out":true,"timeout_sec":45},"meta":{"component":"swift","binary":"twq-swift-dispatchmain-taskhandles-after-repeat"}}'
+    swift_dispatchmain_taskhandles_after_repeat_stockdispatch_customthr_rc=124
+  elif [ "${swift_dispatchmain_taskhandles_after_repeat_stockdispatch_customthr_rc}" -ne 0 ]; then
+    echo "{\"kind\":\"swift-probe\",\"status\":\"error\",\"data\":{\"mode\":\"dispatchmain-taskhandles-after-repeat-stockdispatch-customthr\",\"timed_out\":false,\"rc\":${swift_dispatchmain_taskhandles_after_repeat_stockdispatch_customthr_rc}},\"meta\":{\"component\":\"swift\",\"binary\":\"twq-swift-dispatchmain-taskhandles-after-repeat\"}}"
+  fi
+  echo "=== twq swift dispatchmain taskhandles after repeat stockdispatch customthr probe end ==="
+  echo "=== twq swift dispatchmain taskhandles after repeat stockdispatch customthr stats after ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq swift dispatchmain taskhandles after repeat stockdispatch customthr stats after end ==="
+  if [ "${swift_dispatchmain_taskhandles_after_repeat_stockdispatch_customthr_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+    probe_failure_rc=${swift_dispatchmain_taskhandles_after_repeat_stockdispatch_customthr_rc}
+  fi
+  fi
+  if swift_probe_should_run "dispatchmain-taskhandles-after-repeat-hooks" diagnostic; then
+  echo "=== twq swift dispatchmain taskhandles after repeat hooks stats before ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq swift dispatchmain taskhandles after repeat hooks stats before end ==="
+  echo "=== twq swift dispatchmain taskhandles after repeat hooks probe start ==="
+  swift_dispatchmain_taskhandles_after_repeat_hooks_rc=0
+  RUN_WITH_TIMEOUT_LABEL=dispatchmain-taskhandles-after-repeat-hooks
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=1
+  run_with_timeout 45 swift_trace_env env LD_PRELOAD=/root/twq-swift-hooks/libtwq-swift-concurrency-hooks.so LD_LIBRARY_PATH=${swift_twq_ld} TWQ_SWIFT_HOOK_TRACE=1 TWQ_REPEAT_ROUNDS=64 TWQ_REPEAT_TASKS=8 TWQ_REPEAT_DELAY_MS=20 TWQ_REPEAT_DEBUG_FIRST_ROUND=1 /root/twq-swift-dispatchmain-taskhandles-after-repeat
+  RUN_WITH_TIMEOUT_LABEL=
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=0
+  swift_dispatchmain_taskhandles_after_repeat_hooks_rc=${RUN_WITH_TIMEOUT_STATUS}
+  if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
+    echo '{"kind":"swift-probe","status":"timeout","data":{"mode":"dispatchmain-taskhandles-after-repeat-hooks","timed_out":true,"timeout_sec":45},"meta":{"component":"swift","binary":"twq-swift-dispatchmain-taskhandles-after-repeat"}}'
+    swift_dispatchmain_taskhandles_after_repeat_hooks_rc=124
+  elif [ "${swift_dispatchmain_taskhandles_after_repeat_hooks_rc}" -ne 0 ]; then
+    echo "{\"kind\":\"swift-probe\",\"status\":\"error\",\"data\":{\"mode\":\"dispatchmain-taskhandles-after-repeat-hooks\",\"timed_out\":false,\"rc\":${swift_dispatchmain_taskhandles_after_repeat_hooks_rc}},\"meta\":{\"component\":\"swift\",\"binary\":\"twq-swift-dispatchmain-taskhandles-after-repeat\"}}"
+  fi
+  echo "=== twq swift dispatchmain taskhandles after repeat hooks probe end ==="
+  echo "=== twq swift dispatchmain taskhandles after repeat hooks stats after ==="
+  sysctl kern.twq.init_count \
+    kern.twq.setup_dispatch_count \
+    kern.twq.reqthreads_count \
+    kern.twq.thread_enter_count \
+    kern.twq.thread_return_count
+  echo "=== twq swift dispatchmain taskhandles after repeat hooks stats after end ==="
+  if [ "${swift_dispatchmain_taskhandles_after_repeat_hooks_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+    probe_failure_rc=${swift_dispatchmain_taskhandles_after_repeat_hooks_rc}
+  fi
+  fi
   if swift_probe_should_run "dispatchmain-taskgroup-after" diagnostic; then
   echo "=== twq swift dispatchmain taskgroup after stats before ==="
   sysctl kern.twq.init_count \
@@ -1900,7 +2442,7 @@ log=/var/log/twq-probe.log
   swift_dispatchmain_taskgroup_after_rc=0
   RUN_WITH_TIMEOUT_LABEL=dispatchmain-taskgroup-after
   RUN_WITH_TIMEOUT_DIAGNOSTIC=1
-  run_with_timeout 15 env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-swift/usr/lib/swift/freebsd:/root/twq-lib /root/twq-swift-dispatchmain-taskgroup-after
+  run_with_timeout 15 swift_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-swift/usr/lib/swift/freebsd:/root/twq-lib /root/twq-swift-dispatchmain-taskgroup-after
   RUN_WITH_TIMEOUT_LABEL=
   RUN_WITH_TIMEOUT_DIAGNOSTIC=0
   swift_dispatchmain_taskgroup_after_rc=${RUN_WITH_TIMEOUT_STATUS}
@@ -1927,7 +2469,7 @@ log=/var/log/twq-probe.log
   swift_dispatchmain_taskgroup_after_stockdispatch_rc=0
   RUN_WITH_TIMEOUT_LABEL=dispatchmain-taskgroup-after-stockdispatch
   RUN_WITH_TIMEOUT_DIAGNOSTIC=1
-  run_with_timeout 15 env LD_LIBRARY_PATH=${swift_stock_dispatch_ld} /root/twq-swift-dispatchmain-taskgroup-after
+  run_with_timeout 15 swift_trace_env env LD_LIBRARY_PATH=${swift_stock_dispatch_ld} /root/twq-swift-dispatchmain-taskgroup-after
   RUN_WITH_TIMEOUT_LABEL=
   RUN_WITH_TIMEOUT_DIAGNOSTIC=0
   swift_dispatchmain_taskgroup_after_stockdispatch_rc=${RUN_WITH_TIMEOUT_STATUS}
@@ -1942,6 +2484,26 @@ log=/var/log/twq-probe.log
     probe_failure_rc=${swift_dispatchmain_taskgroup_after_stockdispatch_rc}
   fi
   fi
+  if swift_probe_should_run "dispatchmain-taskgroup-after-customdispatch-stockthr" diagnostic; then
+  echo "=== twq swift dispatchmain taskgroup after customdispatch stockthr probe start ==="
+  swift_dispatchmain_taskgroup_after_customdispatch_stockthr_rc=0
+  RUN_WITH_TIMEOUT_LABEL=dispatchmain-taskgroup-after-customdispatch-stockthr
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=1
+  run_with_timeout 15 swift_trace_env env LD_LIBRARY_PATH=${swift_twq_stockthr_ld} /root/twq-swift-dispatchmain-taskgroup-after
+  RUN_WITH_TIMEOUT_LABEL=
+  RUN_WITH_TIMEOUT_DIAGNOSTIC=0
+  swift_dispatchmain_taskgroup_after_customdispatch_stockthr_rc=${RUN_WITH_TIMEOUT_STATUS}
+  if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
+    echo '{"kind":"swift-probe","status":"timeout","data":{"mode":"dispatchmain-taskgroup-after-customdispatch-stockthr","timed_out":true,"timeout_sec":15},"meta":{"component":"swift","binary":"twq-swift-dispatchmain-taskgroup-after"}}'
+    swift_dispatchmain_taskgroup_after_customdispatch_stockthr_rc=124
+  elif [ "${swift_dispatchmain_taskgroup_after_customdispatch_stockthr_rc}" -ne 0 ]; then
+    echo "{\"kind\":\"swift-probe\",\"status\":\"error\",\"data\":{\"mode\":\"dispatchmain-taskgroup-after-customdispatch-stockthr\",\"timed_out\":false,\"rc\":${swift_dispatchmain_taskgroup_after_customdispatch_stockthr_rc}},\"meta\":{\"component\":\"swift\",\"binary\":\"twq-swift-dispatchmain-taskgroup-after\"}}"
+  fi
+  echo "=== twq swift dispatchmain taskgroup after customdispatch stockthr probe end ==="
+  if [ "${swift_dispatchmain_taskgroup_after_customdispatch_stockthr_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+    probe_failure_rc=${swift_dispatchmain_taskgroup_after_customdispatch_stockthr_rc}
+  fi
+  fi
   if swift_probe_should_run "dispatchmain-taskgroup-after-stockdispatch-customthr" diagnostic; then
   echo "=== twq swift dispatchmain taskgroup after stockdispatch customthr stats before ==="
   sysctl kern.twq.init_count \
@@ -1954,7 +2516,7 @@ log=/var/log/twq-probe.log
   swift_dispatchmain_taskgroup_after_stockdispatch_customthr_rc=0
   RUN_WITH_TIMEOUT_LABEL=dispatchmain-taskgroup-after-stockdispatch-customthr
   RUN_WITH_TIMEOUT_DIAGNOSTIC=1
-  run_with_timeout 15 env LD_LIBRARY_PATH=${swift_stock_dispatch_customthr_ld} /root/twq-swift-dispatchmain-taskgroup-after
+  run_with_timeout 15 swift_trace_env env LD_LIBRARY_PATH=${swift_stock_dispatch_customthr_ld} /root/twq-swift-dispatchmain-taskgroup-after
   RUN_WITH_TIMEOUT_LABEL=
   RUN_WITH_TIMEOUT_DIAGNOSTIC=0
   swift_dispatchmain_taskgroup_after_stockdispatch_customthr_rc=${RUN_WITH_TIMEOUT_STATUS}

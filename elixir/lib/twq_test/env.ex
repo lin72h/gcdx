@@ -288,7 +288,7 @@ defmodule TwqTest.Env do
 
   @spec script_env(t()) :: map()
   def script_env(%__MODULE__{} = env) do
-    %{
+    base = %{
       "TWQ_VM_NAME" => env.vm_name,
       "TWQ_VM_IMAGE" => env.vm_image,
       "TWQ_VM_VCPUS" => env.vcpus,
@@ -310,6 +310,20 @@ defmodule TwqTest.Env do
       "TWQ_SWIFT_PROBE_PROFILE" => env.swift_probe_profile,
       "TWQ_SWIFT_PROBE_FILTER" => env.swift_probe_filter
     }
+
+    [
+      "TWQ_PREPARE_LIBTHR_STAGE",
+      "TWQ_PREPARE_LIBDISPATCH_STAGE",
+      "TWQ_PREPARE_SWIFT_STAGE",
+      "TWQ_SWIFT_CONCURRENCY_OVERRIDE_SO",
+      "TWQ_SWIFT_RUNTIME_TRACE"
+    ]
+    |> Enum.reduce(base, fn key, acc ->
+      case System.get_env(key) do
+        nil -> acc
+        value -> Map.put(acc, key, value)
+      end
+    end)
   end
 
   defp repo_root do

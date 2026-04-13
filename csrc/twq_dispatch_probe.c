@@ -28,14 +28,26 @@ enum dispatch_probe_mode {
 	DISPATCH_PROBE_MODE_EXECUTOR,
 	DISPATCH_PROBE_MODE_AFTER,
 	DISPATCH_PROBE_MODE_EXECUTOR_AFTER,
+	DISPATCH_PROBE_MODE_EXECUTOR_AFTER_DEFAULT_WIDTH,
+	DISPATCH_PROBE_MODE_EXECUTOR_AFTER_SYNC_WIDTH,
 	DISPATCH_PROBE_MODE_EXECUTOR_AFTER_SETTLED,
+	DISPATCH_PROBE_MODE_MAIN_EXECUTOR_AFTER_REPEAT,
+	DISPATCH_PROBE_MODE_MAIN_EXECUTOR_RESUME_REPEAT,
 	DISPATCH_PROBE_MODE_WORKER_AFTER_GROUP,
 	DISPATCH_PROBE_MODE_MAIN,
 	DISPATCH_PROBE_MODE_MAIN_AFTER,
+	DISPATCH_PROBE_MODE_MAIN_ROUNDTRIP_AFTER,
+	DISPATCH_PROBE_MODE_MAIN_GROUP_AFTER,
 	DISPATCH_PROBE_MODE_PRESSURE,
 	DISPATCH_PROBE_MODE_BURST_REUSE,
 	DISPATCH_PROBE_MODE_TIMEOUT_GAP,
 	DISPATCH_PROBE_MODE_SUSTAINED,
+};
+
+enum dispatch_executor_queue_width_mode {
+	DISPATCH_EXECUTOR_QUEUE_WIDTH_ASYNC_LOGICAL,
+	DISPATCH_EXECUTOR_QUEUE_WIDTH_DEFAULT,
+	DISPATCH_EXECUTOR_QUEUE_WIDTH_SYNC_LOGICAL,
 };
 
 struct dispatch_probe_state {
@@ -81,6 +93,37 @@ struct dispatch_main_probe {
 	bool				timed;
 };
 
+struct dispatch_main_roundtrip_probe;
+
+struct dispatch_main_roundtrip_item {
+	struct dispatch_main_roundtrip_probe *probe;
+};
+
+struct dispatch_main_roundtrip_probe {
+	struct dispatch_probe_state		*state;
+	struct dispatch_main_roundtrip_item	*items;
+	const char				*mode;
+	uint32_t				requested;
+	uint32_t				delay_ms;
+	int					features;
+};
+
+struct dispatch_main_group_probe;
+
+struct dispatch_main_group_item {
+	struct dispatch_main_group_probe *probe;
+};
+
+struct dispatch_main_group_probe {
+	struct dispatch_probe_state		*state;
+	struct dispatch_group_s			*group;
+	struct dispatch_main_group_item		*items;
+	const char				*mode;
+	uint32_t				requested;
+	uint32_t				delay_ms;
+	int					features;
+};
+
 struct dispatch_after_group_probe {
 	struct dispatch_probe_state	*state;
 	const char			*mode;
@@ -90,6 +133,71 @@ struct dispatch_after_group_probe {
 	uint32_t			timeout_ms;
 	int				features;
 	volatile int			rc;
+};
+
+struct dispatch_repeat_probe;
+
+struct dispatch_twq_round_counters {
+	uint32_t	reqthreads_count;
+	uint32_t	thread_enter_count;
+	uint32_t	thread_return_count;
+	uint32_t	bucket_total;
+	uint32_t	bucket_idle;
+	uint32_t	bucket_active;
+};
+
+struct dispatch_repeat_child {
+	struct dispatch_repeat_probe	*probe;
+	uint32_t			 task;
+	volatile uint32_t		 done;
+};
+
+struct dispatch_repeat_probe {
+	struct dispatch_probe_state	*state;
+	struct dispatch_repeat_child	*children;
+	dispatch_queue_t		 executor_queue;
+	dispatch_queue_t		 timer_queue;
+	const char			*mode;
+	uint32_t			 rounds;
+	uint32_t			 tasks;
+	uint32_t			 delay_ms;
+	uint32_t			 current_round;
+	uint32_t			 current_task;
+	uint32_t			 round_sum;
+	uint32_t			 completed_rounds;
+	uint32_t			 total_sum;
+	volatile uint32_t		 parent_scheduled;
+	struct dispatch_twq_round_counters round_start_counters;
+	int				 round_start_sysctl_error;
+	int				 features;
+};
+
+struct dispatch_resume_repeat_probe;
+
+struct dispatch_resume_repeat_child {
+	struct dispatch_resume_repeat_probe *probe;
+	dispatch_group_t			  group;
+	uint32_t				  task;
+	uint32_t				  round;
+};
+
+struct dispatch_resume_repeat_probe {
+	struct dispatch_probe_state		*state;
+	struct dispatch_resume_repeat_child	*children;
+	dispatch_queue_t			 executor_queue;
+	dispatch_queue_t			 timer_queue;
+	dispatch_group_t			 round_group;
+	const char				*mode;
+	uint32_t				 rounds;
+	uint32_t				 tasks;
+	uint32_t				 delay_ms;
+	uint32_t				 current_round;
+	uint32_t				 round_sum;
+	uint32_t				 completed_rounds;
+	uint32_t				 total_sum;
+	struct dispatch_twq_round_counters	 round_start_counters;
+	int					 round_start_sysctl_error;
+	int					 features;
 };
 
 static uint32_t
@@ -154,6 +262,29 @@ emit_after_result(const char *mode, const char *status, int rc,
 	    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
 	    status, mode, rc, requested, delay_ms, started, completed,
 	    unique_threads,
+	    max_inflight, main_thread_callbacks, timed_out ? "true" : "false",
+	    features);
+	fflush(stdout);
+}
+
+static void
+emit_repeat_result(const char *mode, const char *status, int rc,
+    uint32_t rounds, uint32_t tasks, uint32_t delay_ms,
+    uint32_t completed_rounds, uint32_t total_sum, uint32_t expected_total_sum,
+    uint32_t started, uint32_t completed, uint32_t unique_threads,
+    uint32_t max_inflight, uint32_t main_thread_callbacks, bool timed_out,
+    int features)
+{
+
+	printf("{\"kind\":\"dispatch-probe\",\"status\":\"%s\",\"data\":{"
+	    "\"mode\":\"%s\",\"rc\":%d,\"rounds\":%u,\"tasks\":%u,"
+	    "\"delay_ms\":%u,\"completed_rounds\":%u,\"total_sum\":%u,"
+	    "\"expected_total_sum\":%u,\"started\":%u,\"completed\":%u,"
+	    "\"unique_threads\":%u,\"max_inflight\":%u,"
+	    "\"main_thread_callbacks\":%u,\"timed_out\":%s,\"features\":%d},"
+	    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
+	    status, mode, rc, rounds, tasks, delay_ms, completed_rounds,
+	    total_sum, expected_total_sum, started, completed, unique_threads,
 	    max_inflight, main_thread_callbacks, timed_out ? "true" : "false",
 	    features);
 	fflush(stdout);
@@ -309,14 +440,26 @@ parse_mode_arg(const char *value)
 		return (DISPATCH_PROBE_MODE_AFTER);
 	if (strcmp(value, "executor-after") == 0)
 		return (DISPATCH_PROBE_MODE_EXECUTOR_AFTER);
+	if (strcmp(value, "executor-after-default-width") == 0)
+		return (DISPATCH_PROBE_MODE_EXECUTOR_AFTER_DEFAULT_WIDTH);
+	if (strcmp(value, "executor-after-sync-width") == 0)
+		return (DISPATCH_PROBE_MODE_EXECUTOR_AFTER_SYNC_WIDTH);
 	if (strcmp(value, "executor-after-settled") == 0)
 		return (DISPATCH_PROBE_MODE_EXECUTOR_AFTER_SETTLED);
+	if (strcmp(value, "main-executor-after-repeat") == 0)
+		return (DISPATCH_PROBE_MODE_MAIN_EXECUTOR_AFTER_REPEAT);
+	if (strcmp(value, "main-executor-resume-repeat") == 0)
+		return (DISPATCH_PROBE_MODE_MAIN_EXECUTOR_RESUME_REPEAT);
 	if (strcmp(value, "worker-after-group") == 0)
 		return (DISPATCH_PROBE_MODE_WORKER_AFTER_GROUP);
 	if (strcmp(value, "main") == 0)
 		return (DISPATCH_PROBE_MODE_MAIN);
 	if (strcmp(value, "main-after") == 0)
 		return (DISPATCH_PROBE_MODE_MAIN_AFTER);
+	if (strcmp(value, "main-roundtrip-after") == 0)
+		return (DISPATCH_PROBE_MODE_MAIN_ROUNDTRIP_AFTER);
+	if (strcmp(value, "main-group-after") == 0)
+		return (DISPATCH_PROBE_MODE_MAIN_GROUP_AFTER);
 	if (strcmp(value, "pressure") == 0)
 		return (DISPATCH_PROBE_MODE_PRESSURE);
 	if (strcmp(value, "burst-reuse") == 0)
@@ -489,6 +632,29 @@ read_bucket_sums(uint32_t *total_out, uint32_t *idle_out, uint32_t *active_out)
 	return (0);
 }
 
+static int
+read_twq_round_counters(struct dispatch_twq_round_counters *counters)
+{
+	int error;
+
+	memset(counters, 0, sizeof(*counters));
+	error = read_sysctl_u32_text("kern.twq.reqthreads_count",
+	    &counters->reqthreads_count);
+	if (error != 0)
+		return (error);
+	error = read_sysctl_u32_text("kern.twq.thread_enter_count",
+	    &counters->thread_enter_count);
+	if (error != 0)
+		return (error);
+	error = read_sysctl_u32_text("kern.twq.thread_return_count",
+	    &counters->thread_return_count);
+	if (error != 0)
+		return (error);
+	error = read_bucket_sums(&counters->bucket_total, &counters->bucket_idle,
+	    &counters->bucket_active);
+	return (error);
+}
+
 static void
 sleep_millis(uint32_t sleep_ms)
 {
@@ -620,6 +786,147 @@ main_queue_exit_worker(void *ctx)
 }
 
 static void
+main_roundtrip_complete_worker(void *ctx)
+{
+	struct dispatch_main_roundtrip_item *item;
+	struct dispatch_main_roundtrip_probe *probe;
+	struct dispatch_probe_state *state;
+	uint32_t completed, main_thread_callbacks, max_inflight, started;
+	uint32_t unique_threads;
+
+	item = ctx;
+	probe = item->probe;
+	state = probe->state;
+	record_common(state);
+	__atomic_sub_fetch(&state->inflight, 1, __ATOMIC_SEQ_CST);
+	completed = __atomic_add_fetch(&state->completed, 1, __ATOMIC_SEQ_CST);
+	if (completed != probe->requested)
+		return;
+
+	started = __atomic_load_n(&state->started, __ATOMIC_SEQ_CST);
+	max_inflight = __atomic_load_n(&state->max_inflight, __ATOMIC_SEQ_CST);
+	main_thread_callbacks = __atomic_load_n(&state->main_thread_callbacks,
+	    __ATOMIC_SEQ_CST);
+	unique_threads = unique_thread_count(state);
+	emit_after_result(probe->mode, "ok", 0, probe->requested,
+	    probe->delay_ms, started, completed, unique_threads, max_inflight,
+	    main_thread_callbacks, false, probe->features);
+	exit(0);
+}
+
+static void
+main_roundtrip_after_worker(void *ctx)
+{
+	struct dispatch_main_roundtrip_item *item;
+	struct dispatch_main_roundtrip_probe *probe;
+	struct dispatch_probe_state *state;
+	uint32_t inflight;
+
+	item = ctx;
+	probe = item->probe;
+	state = probe->state;
+	__atomic_add_fetch(&state->started, 1, __ATOMIC_SEQ_CST);
+	inflight = __atomic_add_fetch(&state->inflight, 1, __ATOMIC_SEQ_CST);
+	update_max(&state->max_inflight, inflight);
+	record_common(state);
+	dispatch_async_f(dispatch_get_main_queue(), item,
+	    main_roundtrip_complete_worker);
+}
+
+static void
+main_roundtrip_root_worker(void *ctx)
+{
+	struct dispatch_main_roundtrip_probe *probe;
+	struct dispatch_probe_state *state;
+	dispatch_queue_t queue;
+	dispatch_time_t when;
+	uint32_t i;
+
+	probe = ctx;
+	state = probe->state;
+	record_common(state);
+	queue = dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0);
+	when = dispatch_time(DISPATCH_TIME_NOW,
+	    (int64_t)probe->delay_ms * 1000000LL);
+
+	for (i = 0; i < probe->requested; i++) {
+		dispatch_after_f(when, queue, &probe->items[i],
+		    main_roundtrip_after_worker);
+	}
+}
+
+static void
+main_group_notify_worker(void *ctx)
+{
+	struct dispatch_main_group_probe *probe;
+	struct dispatch_probe_state *state;
+	uint32_t completed, main_thread_callbacks, max_inflight, started;
+	uint32_t unique_threads;
+
+	probe = ctx;
+	state = probe->state;
+	record_common(state);
+	started = __atomic_load_n(&state->started, __ATOMIC_SEQ_CST);
+	completed = __atomic_load_n(&state->completed, __ATOMIC_SEQ_CST);
+	max_inflight = __atomic_load_n(&state->max_inflight, __ATOMIC_SEQ_CST);
+	main_thread_callbacks = __atomic_load_n(&state->main_thread_callbacks,
+	    __ATOMIC_SEQ_CST);
+	unique_threads = unique_thread_count(state);
+	emit_after_result(probe->mode,
+	    completed == probe->requested ? "ok" : "error",
+	    completed == probe->requested ? 0 : 1,
+	    probe->requested, probe->delay_ms, started, completed,
+	    unique_threads, max_inflight, main_thread_callbacks, false,
+	    probe->features);
+	exit(completed == probe->requested ? 0 : 1);
+}
+
+static void
+main_group_after_worker(void *ctx)
+{
+	struct dispatch_main_group_item *item;
+	struct dispatch_main_group_probe *probe;
+	struct dispatch_probe_state *state;
+	uint32_t inflight;
+
+	item = ctx;
+	probe = item->probe;
+	state = probe->state;
+	__atomic_add_fetch(&state->started, 1, __ATOMIC_SEQ_CST);
+	inflight = __atomic_add_fetch(&state->inflight, 1, __ATOMIC_SEQ_CST);
+	update_max(&state->max_inflight, inflight);
+	record_common(state);
+	__atomic_sub_fetch(&state->inflight, 1, __ATOMIC_SEQ_CST);
+	__atomic_add_fetch(&state->completed, 1, __ATOMIC_SEQ_CST);
+	dispatch_group_leave(probe->group);
+}
+
+static void
+main_group_root_worker(void *ctx)
+{
+	struct dispatch_main_group_probe *probe;
+	struct dispatch_probe_state *state;
+	dispatch_queue_t queue;
+	dispatch_time_t when;
+	uint32_t i;
+
+	probe = ctx;
+	state = probe->state;
+	record_common(state);
+	queue = dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0);
+	when = dispatch_time(DISPATCH_TIME_NOW,
+	    (int64_t)probe->delay_ms * 1000000LL);
+
+	for (i = 0; i < probe->requested; i++) {
+		dispatch_group_enter(probe->group);
+		dispatch_after_f(when, queue, &probe->items[i],
+		    main_group_after_worker);
+	}
+	dispatch_group_notify_f(probe->group, dispatch_get_main_queue(), probe,
+	    main_group_notify_worker);
+}
+
+static void
 pressure_high_worker(void *ctx)
 {
 	struct dispatch_probe_state *state;
@@ -697,15 +1004,30 @@ run_basic_mode(struct dispatch_probe_state *state, uint32_t requested,
 }
 
 static dispatch_queue_t
-create_executor_queue(dispatch_qos_class_t qos)
+create_executor_queue(dispatch_qos_class_t qos,
+    enum dispatch_executor_queue_width_mode width_mode)
 {
 	dispatch_queue_attr_t attr;
 	dispatch_queue_t queue;
+	long logical_cpus;
 
 	attr = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_CONCURRENT,
 	    qos, 0);
 	queue = dispatch_queue_create("twq.swift.executor", attr);
-	dispatch_queue_set_width(queue, DISPATCH_QUEUE_WIDTH_MAX_LOGICAL_CPUS);
+	switch (width_mode) {
+	case DISPATCH_EXECUTOR_QUEUE_WIDTH_ASYNC_LOGICAL:
+		dispatch_queue_set_width(queue,
+		    DISPATCH_QUEUE_WIDTH_MAX_LOGICAL_CPUS);
+		break;
+	case DISPATCH_EXECUTOR_QUEUE_WIDTH_DEFAULT:
+		break;
+	case DISPATCH_EXECUTOR_QUEUE_WIDTH_SYNC_LOGICAL:
+		logical_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+		if (logical_cpus < 1)
+			logical_cpus = 1;
+		dispatch_queue_set_width(queue, logical_cpus);
+		break;
+	}
 	return (queue);
 }
 
@@ -733,7 +1055,8 @@ run_executor_mode(struct dispatch_probe_state *state, uint32_t requested,
 	bool timed_out;
 
 	group = dispatch_group_create();
-	queue = create_executor_queue(QOS_CLASS_DEFAULT);
+	queue = create_executor_queue(QOS_CLASS_DEFAULT,
+	    DISPATCH_EXECUTOR_QUEUE_WIDTH_ASYNC_LOGICAL);
 	state->group = group;
 
 	for (i = 0; i < (int)requested; i++) {
@@ -826,9 +1149,40 @@ run_executor_after_mode(struct dispatch_probe_state *state, uint32_t requested,
 	dispatch_queue_t queue;
 	int rc;
 
-	queue = create_executor_queue(QOS_CLASS_DEFAULT);
+	queue = create_executor_queue(QOS_CLASS_DEFAULT,
+	    DISPATCH_EXECUTOR_QUEUE_WIDTH_ASYNC_LOGICAL);
 	rc = run_after_mode_with_queue("executor-after", state, queue, requested,
 	    delay_ms, timeout_ms, features);
+	dispatch_release(queue);
+	return (rc);
+}
+
+static int
+run_executor_after_default_width_mode(struct dispatch_probe_state *state,
+    uint32_t requested, uint32_t delay_ms, uint32_t timeout_ms, int features)
+{
+	dispatch_queue_t queue;
+	int rc;
+
+	queue = create_executor_queue(QOS_CLASS_DEFAULT,
+	    DISPATCH_EXECUTOR_QUEUE_WIDTH_DEFAULT);
+	rc = run_after_mode_with_queue("executor-after-default-width", state,
+	    queue, requested, delay_ms, timeout_ms, features);
+	dispatch_release(queue);
+	return (rc);
+}
+
+static int
+run_executor_after_sync_width_mode(struct dispatch_probe_state *state,
+    uint32_t requested, uint32_t delay_ms, uint32_t timeout_ms, int features)
+{
+	dispatch_queue_t queue;
+	int rc;
+
+	queue = create_executor_queue(QOS_CLASS_DEFAULT,
+	    DISPATCH_EXECUTOR_QUEUE_WIDTH_SYNC_LOGICAL);
+	rc = run_after_mode_with_queue("executor-after-sync-width", state, queue,
+	    requested, delay_ms, timeout_ms, features);
 	dispatch_release(queue);
 	return (rc);
 }
@@ -840,12 +1194,523 @@ run_executor_after_settled_mode(struct dispatch_probe_state *state,
 	dispatch_queue_t queue;
 	int rc;
 
-	queue = create_executor_queue(QOS_CLASS_DEFAULT);
+	queue = create_executor_queue(QOS_CLASS_DEFAULT,
+	    DISPATCH_EXECUTOR_QUEUE_WIDTH_ASYNC_LOGICAL);
 	settle_executor_queue(queue);
 	rc = run_after_mode_with_queue("executor-after-settled", state, queue,
 	    requested, delay_ms, timeout_ms, features);
 	dispatch_release(queue);
 	return (rc);
+}
+
+static void repeat_child_worker(void *ctx);
+static void
+repeat_parent_worker(void *ctx);
+
+static void
+schedule_repeat_parent(struct dispatch_repeat_probe *probe)
+{
+
+	if (__atomic_exchange_n(&probe->parent_scheduled, 1,
+	    __ATOMIC_SEQ_CST) == 0) {
+		dispatch_async_f(probe->executor_queue, probe, repeat_parent_worker);
+	}
+}
+
+static void
+start_repeat_round(struct dispatch_repeat_probe *probe)
+{
+	dispatch_time_t when;
+	uint32_t i;
+
+	probe->round_start_sysctl_error = read_twq_round_counters(
+	    &probe->round_start_counters);
+	printf("{\"kind\":\"dispatch-probe\",\"status\":\"progress\",\"data\":{"
+	    "\"mode\":\"%s\",\"phase\":\"round-start\",\"round\":%u,"
+	    "\"completed_rounds\":%u},"
+	    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
+	    probe->mode, probe->current_round, probe->completed_rounds);
+	if (probe->round_start_sysctl_error == 0) {
+		printf("{\"kind\":\"dispatch-probe\",\"status\":\"progress\",\"data\":{"
+		    "\"mode\":\"%s\",\"phase\":\"round-start-counters\","
+		    "\"round\":%u,\"completed_rounds\":%u,"
+		    "\"reqthreads_count\":%u,\"thread_enter_count\":%u,"
+		    "\"thread_return_count\":%u,\"bucket_total\":%u,"
+		    "\"bucket_idle\":%u,\"bucket_active\":%u},"
+		    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
+		    probe->mode, probe->current_round, probe->completed_rounds,
+		    probe->round_start_counters.reqthreads_count,
+		    probe->round_start_counters.thread_enter_count,
+		    probe->round_start_counters.thread_return_count,
+		    probe->round_start_counters.bucket_total,
+		    probe->round_start_counters.bucket_idle,
+		    probe->round_start_counters.bucket_active);
+	} else {
+		printf("{\"kind\":\"dispatch-probe\",\"status\":\"progress\",\"data\":{"
+		    "\"mode\":\"%s\",\"phase\":\"round-start-counters\","
+		    "\"round\":%u,\"completed_rounds\":%u,\"sysctl_error\":%d},"
+		    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
+		    probe->mode, probe->current_round, probe->completed_rounds,
+		    probe->round_start_sysctl_error);
+	}
+	fflush(stdout);
+
+	probe->current_task = 0;
+	probe->round_sum = 0;
+	when = dispatch_time(DISPATCH_TIME_NOW,
+	    (int64_t)probe->delay_ms * 1000000LL);
+	for (i = 0; i < probe->tasks; i++) {
+		probe->children[i].probe = probe;
+		probe->children[i].task = i;
+		__atomic_store_n(&probe->children[i].done, 0, __ATOMIC_RELEASE);
+		dispatch_after_f(when, probe->timer_queue, &probe->children[i],
+		    repeat_child_worker);
+	}
+}
+
+static void
+repeat_finish_ok(struct dispatch_repeat_probe *probe)
+{
+	struct dispatch_probe_state *state;
+	uint32_t completed, main_thread_callbacks, max_inflight, started;
+	uint32_t unique_threads;
+
+	state = probe->state;
+	started = __atomic_load_n(&state->started, __ATOMIC_SEQ_CST);
+	completed = __atomic_load_n(&state->completed, __ATOMIC_SEQ_CST);
+	max_inflight = __atomic_load_n(&state->max_inflight, __ATOMIC_SEQ_CST);
+	main_thread_callbacks = __atomic_load_n(&state->main_thread_callbacks,
+	    __ATOMIC_SEQ_CST);
+	unique_threads = unique_thread_count(state);
+
+	emit_repeat_result(probe->mode, "ok", 0, probe->rounds, probe->tasks,
+	    probe->delay_ms, probe->completed_rounds, probe->total_sum,
+	    probe->rounds * (probe->tasks * (probe->tasks - 1) / 2), started,
+	    completed, unique_threads, max_inflight, main_thread_callbacks,
+	    false, probe->features);
+	exit(0);
+}
+
+static void
+repeat_child_worker(void *ctx)
+{
+	struct dispatch_repeat_child *child;
+	struct dispatch_repeat_probe *probe;
+	struct dispatch_probe_state *state;
+	uint32_t inflight;
+
+	child = ctx;
+	probe = child->probe;
+	state = probe->state;
+	__atomic_add_fetch(&state->started, 1, __ATOMIC_SEQ_CST);
+	inflight = __atomic_add_fetch(&state->inflight, 1, __ATOMIC_SEQ_CST);
+	update_max(&state->max_inflight, inflight);
+	record_common(state);
+	__atomic_store_n(&child->done, 1, __ATOMIC_RELEASE);
+	__atomic_sub_fetch(&state->inflight, 1, __ATOMIC_SEQ_CST);
+	__atomic_add_fetch(&state->completed, 1, __ATOMIC_SEQ_CST);
+	schedule_repeat_parent(probe);
+}
+
+static void
+repeat_parent_worker(void *ctx)
+{
+	struct dispatch_repeat_probe *probe;
+	struct dispatch_repeat_child *child;
+	struct dispatch_probe_state *state;
+	struct dispatch_twq_round_counters round_end_counters;
+	int round_end_sysctl_error;
+
+	probe = ctx;
+	state = probe->state;
+	__atomic_store_n(&probe->parent_scheduled, 0, __ATOMIC_SEQ_CST);
+	record_common(state);
+
+	for (;;) {
+		while (probe->current_task < probe->tasks) {
+			child = &probe->children[probe->current_task];
+			if (__atomic_load_n(&child->done, __ATOMIC_ACQUIRE) == 0)
+				goto out;
+			probe->round_sum += probe->current_task;
+			probe->current_task++;
+		}
+
+		probe->completed_rounds++;
+		probe->total_sum += probe->round_sum;
+		round_end_sysctl_error = read_twq_round_counters(&round_end_counters);
+		printf("{\"kind\":\"dispatch-probe\",\"status\":\"progress\",\"data\":{"
+		    "\"mode\":\"%s\",\"phase\":\"round-ok\",\"round\":%u,"
+		    "\"round_sum\":%u,\"expected_round_sum\":%u,"
+		    "\"completed_rounds\":%u,\"total_sum\":%u},"
+		    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
+		    probe->mode, probe->current_round, probe->round_sum,
+		    probe->tasks * (probe->tasks - 1) / 2, probe->completed_rounds,
+		    probe->total_sum);
+		if (probe->round_start_sysctl_error == 0 &&
+		    round_end_sysctl_error == 0) {
+			printf("{\"kind\":\"dispatch-probe\",\"status\":\"progress\",\"data\":{"
+			    "\"mode\":\"%s\",\"phase\":\"round-ok-counters\","
+			    "\"round\":%u,\"completed_rounds\":%u,"
+			    "\"reqthreads_count\":%u,\"thread_enter_count\":%u,"
+			    "\"thread_return_count\":%u,\"bucket_total\":%u,"
+			    "\"bucket_idle\":%u,\"bucket_active\":%u,"
+			    "\"reqthreads_delta\":%u,\"thread_enter_delta\":%u,"
+			    "\"thread_return_delta\":%u},"
+			    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
+			    probe->mode, probe->current_round, probe->completed_rounds,
+			    round_end_counters.reqthreads_count,
+			    round_end_counters.thread_enter_count,
+			    round_end_counters.thread_return_count,
+			    round_end_counters.bucket_total,
+			    round_end_counters.bucket_idle,
+			    round_end_counters.bucket_active,
+			    round_end_counters.reqthreads_count -
+			    probe->round_start_counters.reqthreads_count,
+			    round_end_counters.thread_enter_count -
+			    probe->round_start_counters.thread_enter_count,
+			    round_end_counters.thread_return_count -
+			    probe->round_start_counters.thread_return_count);
+		} else {
+			printf("{\"kind\":\"dispatch-probe\",\"status\":\"progress\",\"data\":{"
+			    "\"mode\":\"%s\",\"phase\":\"round-ok-counters\","
+			    "\"round\":%u,\"completed_rounds\":%u,\"sysctl_error\":%d},"
+			    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
+			    probe->mode, probe->current_round, probe->completed_rounds,
+			    probe->round_start_sysctl_error != 0 ?
+			    probe->round_start_sysctl_error : round_end_sysctl_error);
+		}
+		fflush(stdout);
+
+		probe->current_round++;
+		if (probe->current_round >= probe->rounds)
+			repeat_finish_ok(probe);
+		start_repeat_round(probe);
+	}
+
+out:
+	if (probe->current_round < probe->rounds &&
+	    probe->current_task < probe->tasks &&
+	    __atomic_load_n(&probe->children[probe->current_task].done,
+	    __ATOMIC_ACQUIRE) != 0) {
+		schedule_repeat_parent(probe);
+	}
+}
+
+static void
+repeat_root_worker(void *ctx)
+{
+	struct dispatch_repeat_probe *probe;
+
+	probe = ctx;
+	record_common(probe->state);
+	start_repeat_round(probe);
+}
+
+static int
+run_main_executor_after_repeat_mode(struct dispatch_probe_state *state,
+    uint32_t rounds, uint32_t tasks, uint32_t delay_ms, int features)
+{
+	struct dispatch_repeat_probe probe;
+	uint32_t expected_total_sum;
+
+	if (rounds == 0 || tasks == 0) {
+		expected_total_sum = rounds * (tasks * (tasks - 1) / 2);
+		emit_repeat_result("main-executor-after-repeat", "ok", 0, rounds,
+		    tasks, delay_ms, rounds, expected_total_sum, expected_total_sum,
+		    0, 0, 0, 0, 0, false, features);
+		return (0);
+	}
+
+	memset(&probe, 0, sizeof(probe));
+	probe.state = state;
+	probe.mode = "main-executor-after-repeat";
+	probe.rounds = rounds;
+	probe.tasks = tasks;
+	probe.delay_ms = delay_ms;
+	probe.timer_queue = dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0);
+	probe.features = features;
+	probe.children = calloc(tasks, sizeof(*probe.children));
+	if (probe.children == NULL) {
+		perror("calloc");
+		emit_repeat_result("main-executor-after-repeat", "error", errno,
+		    rounds, tasks, delay_ms, 0, 0,
+		    rounds * (tasks * (tasks - 1) / 2), 0, 0, 0, 0, 0, false,
+		    features);
+		return (1);
+	}
+
+	probe.executor_queue = create_executor_queue(QOS_CLASS_DEFAULT,
+	    DISPATCH_EXECUTOR_QUEUE_WIDTH_ASYNC_LOGICAL);
+	settle_executor_queue(probe.executor_queue);
+
+	printf("{\"kind\":\"dispatch-probe\",\"status\":\"progress\",\"data\":{"
+	    "\"mode\":\"%s\",\"phase\":\"before-spawn\",\"rounds\":%u,"
+	    "\"tasks\":%u,\"delay_ms\":%u},"
+	    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
+	    probe.mode, probe.rounds, probe.tasks, probe.delay_ms);
+	fflush(stdout);
+
+	dispatch_async_f(dispatch_get_main_queue(), &probe, repeat_root_worker);
+	dispatch_main();
+	return (1);
+}
+
+static void
+resume_repeat_finish_ok(struct dispatch_resume_repeat_probe *probe)
+{
+	struct dispatch_probe_state *state;
+	uint32_t completed, main_thread_callbacks, max_inflight, started;
+	uint32_t unique_threads;
+
+	state = probe->state;
+	started = __atomic_load_n(&state->started, __ATOMIC_SEQ_CST);
+	completed = __atomic_load_n(&state->completed, __ATOMIC_SEQ_CST);
+	max_inflight = __atomic_load_n(&state->max_inflight, __ATOMIC_SEQ_CST);
+	main_thread_callbacks = __atomic_load_n(&state->main_thread_callbacks,
+	    __ATOMIC_SEQ_CST);
+	unique_threads = unique_thread_count(state);
+
+	emit_repeat_result(probe->mode, "ok", 0, probe->rounds, probe->tasks,
+	    probe->delay_ms, probe->completed_rounds, probe->total_sum,
+	    probe->rounds * (probe->tasks * (probe->tasks - 1) / 2), started,
+	    completed, unique_threads, max_inflight, main_thread_callbacks,
+	    false, probe->features);
+	exit(0);
+}
+
+static void
+resume_repeat_round_complete_worker(void *ctx);
+
+static void
+resume_repeat_resume_worker(void *ctx)
+{
+	struct dispatch_resume_repeat_child *child;
+	struct dispatch_resume_repeat_probe *probe;
+	struct dispatch_probe_state *state;
+	uint32_t inflight;
+
+	child = ctx;
+	probe = child->probe;
+	state = probe->state;
+	__atomic_add_fetch(&state->started, 1, __ATOMIC_SEQ_CST);
+	inflight = __atomic_add_fetch(&state->inflight, 1, __ATOMIC_SEQ_CST);
+	update_max(&state->max_inflight, inflight);
+	record_common(state);
+	__atomic_add_fetch(&probe->round_sum, child->task, __ATOMIC_SEQ_CST);
+	__atomic_sub_fetch(&state->inflight, 1, __ATOMIC_SEQ_CST);
+	__atomic_add_fetch(&state->completed, 1, __ATOMIC_SEQ_CST);
+	dispatch_group_leave(child->group);
+}
+
+static void
+resume_repeat_timer_worker(void *ctx)
+{
+	struct dispatch_resume_repeat_child *child;
+
+	child = ctx;
+	dispatch_async_f(child->probe->executor_queue, child,
+	    resume_repeat_resume_worker);
+}
+
+static void
+resume_repeat_start_round(struct dispatch_resume_repeat_probe *probe)
+{
+	dispatch_group_t group;
+	dispatch_time_t when;
+	uint32_t i;
+
+	probe->round_start_sysctl_error = read_twq_round_counters(
+	    &probe->round_start_counters);
+	printf("{\"kind\":\"dispatch-probe\",\"status\":\"progress\",\"data\":{"
+	    "\"mode\":\"%s\",\"phase\":\"round-start\",\"round\":%u,"
+	    "\"completed_rounds\":%u},"
+	    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
+	    probe->mode, probe->current_round, probe->completed_rounds);
+	if (probe->round_start_sysctl_error == 0) {
+		printf("{\"kind\":\"dispatch-probe\",\"status\":\"progress\",\"data\":{"
+		    "\"mode\":\"%s\",\"phase\":\"round-start-counters\","
+		    "\"round\":%u,\"completed_rounds\":%u,"
+		    "\"reqthreads_count\":%u,\"thread_enter_count\":%u,"
+		    "\"thread_return_count\":%u,\"bucket_total\":%u,"
+		    "\"bucket_idle\":%u,\"bucket_active\":%u},"
+		    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
+		    probe->mode, probe->current_round, probe->completed_rounds,
+		    probe->round_start_counters.reqthreads_count,
+		    probe->round_start_counters.thread_enter_count,
+		    probe->round_start_counters.thread_return_count,
+		    probe->round_start_counters.bucket_total,
+		    probe->round_start_counters.bucket_idle,
+		    probe->round_start_counters.bucket_active);
+	} else {
+		printf("{\"kind\":\"dispatch-probe\",\"status\":\"progress\",\"data\":{"
+		    "\"mode\":\"%s\",\"phase\":\"round-start-counters\","
+		    "\"round\":%u,\"completed_rounds\":%u,\"sysctl_error\":%d},"
+		    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
+		    probe->mode, probe->current_round, probe->completed_rounds,
+		    probe->round_start_sysctl_error);
+	}
+	fflush(stdout);
+
+	group = dispatch_group_create();
+	probe->round_group = group;
+	probe->round_sum = 0;
+	when = dispatch_time(DISPATCH_TIME_NOW,
+	    (int64_t)probe->delay_ms * 1000000LL);
+	for (i = 0; i < probe->tasks; i++) {
+		probe->children[i].probe = probe;
+		probe->children[i].group = group;
+		probe->children[i].task = i;
+		probe->children[i].round = probe->current_round;
+		dispatch_group_enter(group);
+		dispatch_after_f(when, probe->timer_queue, &probe->children[i],
+		    resume_repeat_timer_worker);
+	}
+
+	dispatch_group_notify_f(group, probe->executor_queue, probe,
+	    resume_repeat_round_complete_worker);
+}
+
+static void
+resume_repeat_round_complete_worker(void *ctx)
+{
+	struct dispatch_resume_repeat_probe *probe;
+	struct dispatch_twq_round_counters round_end_counters;
+	uint32_t expected_round_sum;
+	uint32_t main_thread_callbacks, max_inflight, started, completed;
+	uint32_t unique_threads;
+	int round_end_sysctl_error;
+
+	probe = ctx;
+	expected_round_sum = probe->tasks * (probe->tasks - 1) / 2;
+	record_common(probe->state);
+	probe->completed_rounds++;
+	probe->total_sum += probe->round_sum;
+	round_end_sysctl_error = read_twq_round_counters(&round_end_counters);
+
+	printf("{\"kind\":\"dispatch-probe\",\"status\":\"progress\",\"data\":{"
+	    "\"mode\":\"%s\",\"phase\":\"round-ok\",\"round\":%u,"
+	    "\"round_sum\":%u,\"expected_round_sum\":%u,"
+	    "\"completed_rounds\":%u,\"total_sum\":%u},"
+	    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
+	    probe->mode, probe->current_round, probe->round_sum,
+	    expected_round_sum, probe->completed_rounds, probe->total_sum);
+	if (probe->round_start_sysctl_error == 0 && round_end_sysctl_error == 0) {
+		printf("{\"kind\":\"dispatch-probe\",\"status\":\"progress\",\"data\":{"
+		    "\"mode\":\"%s\",\"phase\":\"round-ok-counters\","
+		    "\"round\":%u,\"completed_rounds\":%u,"
+		    "\"reqthreads_count\":%u,\"thread_enter_count\":%u,"
+		    "\"thread_return_count\":%u,\"bucket_total\":%u,"
+		    "\"bucket_idle\":%u,\"bucket_active\":%u,"
+		    "\"reqthreads_delta\":%u,\"thread_enter_delta\":%u,"
+		    "\"thread_return_delta\":%u},"
+		    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
+		    probe->mode, probe->current_round, probe->completed_rounds,
+		    round_end_counters.reqthreads_count,
+		    round_end_counters.thread_enter_count,
+		    round_end_counters.thread_return_count,
+		    round_end_counters.bucket_total,
+		    round_end_counters.bucket_idle,
+		    round_end_counters.bucket_active,
+		    round_end_counters.reqthreads_count -
+		    probe->round_start_counters.reqthreads_count,
+		    round_end_counters.thread_enter_count -
+		    probe->round_start_counters.thread_enter_count,
+		    round_end_counters.thread_return_count -
+		    probe->round_start_counters.thread_return_count);
+	} else {
+		printf("{\"kind\":\"dispatch-probe\",\"status\":\"progress\",\"data\":{"
+		    "\"mode\":\"%s\",\"phase\":\"round-ok-counters\","
+		    "\"round\":%u,\"completed_rounds\":%u,\"sysctl_error\":%d},"
+		    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
+		    probe->mode, probe->current_round, probe->completed_rounds,
+		    probe->round_start_sysctl_error != 0 ?
+		    probe->round_start_sysctl_error : round_end_sysctl_error);
+	}
+	fflush(stdout);
+
+	dispatch_release(probe->round_group);
+	probe->round_group = NULL;
+	if (probe->round_sum != expected_round_sum) {
+		started = __atomic_load_n(&probe->state->started, __ATOMIC_SEQ_CST);
+		completed = __atomic_load_n(&probe->state->completed,
+		    __ATOMIC_SEQ_CST);
+		max_inflight = __atomic_load_n(&probe->state->max_inflight,
+		    __ATOMIC_SEQ_CST);
+		main_thread_callbacks = __atomic_load_n(
+		    &probe->state->main_thread_callbacks, __ATOMIC_SEQ_CST);
+		unique_threads = unique_thread_count(probe->state);
+		emit_repeat_result(probe->mode, "error", EPROTO, probe->rounds,
+		    probe->tasks, probe->delay_ms, probe->completed_rounds,
+		    probe->total_sum, probe->rounds * expected_round_sum, started,
+		    completed, unique_threads, max_inflight, main_thread_callbacks,
+		    false, probe->features);
+		exit(1);
+	}
+
+	probe->current_round++;
+	if (probe->current_round >= probe->rounds)
+		resume_repeat_finish_ok(probe);
+	resume_repeat_start_round(probe);
+}
+
+static void
+resume_repeat_root_worker(void *ctx)
+{
+	struct dispatch_resume_repeat_probe *probe;
+
+	probe = ctx;
+	record_common(probe->state);
+	resume_repeat_start_round(probe);
+}
+
+static int
+run_main_executor_resume_repeat_mode(struct dispatch_probe_state *state,
+    uint32_t rounds, uint32_t tasks, uint32_t delay_ms, int features)
+{
+	struct dispatch_resume_repeat_probe probe;
+	uint32_t expected_total_sum;
+
+	if (rounds == 0 || tasks == 0) {
+		expected_total_sum = rounds * (tasks * (tasks - 1) / 2);
+		emit_repeat_result("main-executor-resume-repeat", "ok", 0, rounds,
+		    tasks, delay_ms, rounds, expected_total_sum, expected_total_sum,
+		    0, 0, 0, 0, 0, false, features);
+		return (0);
+	}
+
+	memset(&probe, 0, sizeof(probe));
+	probe.state = state;
+	probe.mode = "main-executor-resume-repeat";
+	probe.rounds = rounds;
+	probe.tasks = tasks;
+	probe.delay_ms = delay_ms;
+	probe.timer_queue = dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0);
+	probe.features = features;
+	probe.children = calloc(tasks, sizeof(*probe.children));
+	if (probe.children == NULL) {
+		perror("calloc");
+		emit_repeat_result("main-executor-resume-repeat", "error", errno,
+		    rounds, tasks, delay_ms, 0, 0,
+		    rounds * (tasks * (tasks - 1) / 2), 0, 0, 0, 0, 0, false,
+		    features);
+		return (1);
+	}
+
+	probe.executor_queue = create_executor_queue(QOS_CLASS_DEFAULT,
+	    DISPATCH_EXECUTOR_QUEUE_WIDTH_ASYNC_LOGICAL);
+	settle_executor_queue(probe.executor_queue);
+
+	printf("{\"kind\":\"dispatch-probe\",\"status\":\"progress\",\"data\":{"
+	    "\"mode\":\"%s\",\"phase\":\"before-spawn\",\"rounds\":%u,"
+	    "\"tasks\":%u,\"delay_ms\":%u},"
+	    "\"meta\":{\"component\":\"c\",\"binary\":\"twq-dispatch-probe\"}}\n",
+	    probe.mode, probe.rounds, probe.tasks, probe.delay_ms);
+	fflush(stdout);
+
+	dispatch_async_f(dispatch_get_main_queue(), &probe,
+	    resume_repeat_root_worker);
+	dispatch_main();
+	return (1);
 }
 
 static void
@@ -1000,6 +1865,75 @@ run_main_after_mode(struct dispatch_probe_state *state, uint32_t requested,
 {
 	return (run_main_mode_with_queue("main-after", state,
 	    dispatch_get_main_queue(), requested, delay_ms, features, true));
+}
+
+static int
+run_main_roundtrip_after_mode(struct dispatch_probe_state *state,
+    uint32_t requested, uint32_t delay_ms, int features)
+{
+	struct dispatch_main_roundtrip_probe probe;
+	uint32_t i;
+
+	if (requested == 0) {
+		emit_after_result("main-roundtrip-after", "ok", 0, 0, delay_ms,
+		    0, 0, 0, 0, 0, false, features);
+		return (0);
+	}
+
+	memset(&probe, 0, sizeof(probe));
+	probe.state = state;
+	probe.mode = "main-roundtrip-after";
+	probe.requested = requested;
+	probe.delay_ms = delay_ms;
+	probe.features = features;
+	probe.items = calloc(requested, sizeof(*probe.items));
+	if (probe.items == NULL) {
+		perror("calloc");
+		return (1);
+	}
+	for (i = 0; i < requested; i++)
+		probe.items[i].probe = &probe;
+
+	dispatch_async_f(dispatch_get_main_queue(), &probe,
+	    main_roundtrip_root_worker);
+	dispatch_main();
+	return (1);
+}
+
+static int
+run_main_group_after_mode(struct dispatch_probe_state *state,
+    uint32_t requested, uint32_t delay_ms, int features)
+{
+	struct dispatch_main_group_probe probe;
+	uint32_t i;
+
+	if (requested == 0) {
+		emit_after_result("main-group-after", "ok", 0, 0, delay_ms, 0,
+		    0, 0, 0, 0, false, features);
+		return (0);
+	}
+
+	memset(&probe, 0, sizeof(probe));
+	probe.state = state;
+	probe.mode = "main-group-after";
+	probe.requested = requested;
+	probe.delay_ms = delay_ms;
+	probe.features = features;
+	probe.group = dispatch_group_create();
+	probe.items = calloc(requested, sizeof(*probe.items));
+	if (probe.group == NULL || probe.items == NULL) {
+		if (probe.group != NULL)
+			dispatch_release(probe.group);
+		free(probe.items);
+		perror("dispatch_group_create");
+		return (1);
+	}
+	for (i = 0; i < requested; i++)
+		probe.items[i].probe = &probe;
+
+	dispatch_async_f(dispatch_get_main_queue(), &probe, main_group_root_worker);
+	dispatch_main();
+	return (1);
 }
 
 static int
@@ -1474,9 +2408,25 @@ main(int argc, char **argv)
 		rc = run_executor_after_mode(&state, requested, sleep_ms,
 		    timeout_ms, features);
 		break;
+	case DISPATCH_PROBE_MODE_EXECUTOR_AFTER_DEFAULT_WIDTH:
+		rc = run_executor_after_default_width_mode(&state, requested,
+		    sleep_ms, timeout_ms, features);
+		break;
+	case DISPATCH_PROBE_MODE_EXECUTOR_AFTER_SYNC_WIDTH:
+		rc = run_executor_after_sync_width_mode(&state, requested,
+		    sleep_ms, timeout_ms, features);
+		break;
 	case DISPATCH_PROBE_MODE_EXECUTOR_AFTER_SETTLED:
 		rc = run_executor_after_settled_mode(&state, requested, sleep_ms,
 		    timeout_ms, features);
+		break;
+	case DISPATCH_PROBE_MODE_MAIN_EXECUTOR_AFTER_REPEAT:
+		rc = run_main_executor_after_repeat_mode(&state, rounds, requested,
+		    sleep_ms, features);
+		break;
+	case DISPATCH_PROBE_MODE_MAIN_EXECUTOR_RESUME_REPEAT:
+		rc = run_main_executor_resume_repeat_mode(&state, rounds, requested,
+		    sleep_ms, features);
 		break;
 	case DISPATCH_PROBE_MODE_WORKER_AFTER_GROUP:
 		rc = run_worker_after_group_mode(&state, requested, sleep_ms,
@@ -1487,6 +2437,14 @@ main(int argc, char **argv)
 		break;
 	case DISPATCH_PROBE_MODE_MAIN_AFTER:
 		rc = run_main_after_mode(&state, requested, sleep_ms, features);
+		break;
+	case DISPATCH_PROBE_MODE_MAIN_ROUNDTRIP_AFTER:
+		rc = run_main_roundtrip_after_mode(&state, requested, sleep_ms,
+		    features);
+		break;
+	case DISPATCH_PROBE_MODE_MAIN_GROUP_AFTER:
+		rc = run_main_group_after_mode(&state, requested, sleep_ms,
+		    features);
 		break;
 	case DISPATCH_PROBE_MODE_PRESSURE:
 		rc = run_pressure_mode(&state, requested, requested_high,
