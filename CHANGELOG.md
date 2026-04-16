@@ -2,6 +2,72 @@
 
 ## 2026-04-16
 
+### M14 macOS comparison lane landed
+
+The repo now has a native macOS comparison lane for the M13 -> M14 decision,
+instead of relying on one-off local notes.
+
+What changed:
+
+1. `swiftsrc/twq_swift_dispatchmain_taskhandles_after_repeat.swift` now builds
+   on both FreeBSD and macOS, while keeping the same repeated delayed-child
+   `dispatchMain()` workload shape;
+2. a new native C calibration lane was added at
+   `csrc/twq_macos_dispatch_resume_repeat.c` for the same
+   `main-executor-resume-repeat` tuple on stock macOS;
+3. `csrc/twq_macos_dispatch_introspection.c` and
+   `csrc/twq_macos_dispatch_introspection.h` add a stock-binary
+   introspection-backed counter shim for root-queue enqueue classification and
+   worker-request counting on macOS;
+4. `scripts/macos/prepare-m14.sh` now builds both macOS binaries plus the
+   shared introspection shim with the Xcode-default toolchain;
+5. `scripts/macos/check-m14-symbols.py` records stock symbol visibility,
+   runtime `dlsym()` reachability, DTrace accessibility, and relevant
+   `xctrace` support;
+6. `scripts/macos/run-m14-stock.sh` now produces one artifact directory with
+   raw logs, host metadata, normalized JSON, and a short summary;
+7. `scripts/macos/run-m14-introspection.sh` now runs both workloads under
+   `/usr/lib/system/introspection` and writes a comparison-ready report JSON;
+8. `scripts/macos/extract-m14-run.py`,
+   `scripts/macos/extract-m14-introspection-report.py`, and
+   `scripts/macos/summarize-m14-run.py` preserve the steady-state
+   `rounds 8-63` view instead of only totals;
+9. `scripts/macos/README.md` now documents the stock-first path, the
+   introspection path, and the fallback custom-build plan.
+
+What the local macOS runs proved:
+
+1. the native Swift repeat lane completes all `64` rounds with the matched
+   `8` tasks and `20ms` delay tuple on macOS;
+2. the native C control lane completes the same tuple too;
+3. on this host, the stock SDK and runtime do not expose
+   `_dispatch_root_queue_push`, `_dispatch_root_queue_poke_slow`,
+   `_dispatch_queue_cleanup2`, or `_dispatch_lane_barrier_complete` as usable
+   live symbols;
+4. `_pthread_workqueue_addthreads` is still runtime-resolvable on the same
+   host;
+5. stock `dtrace` is blocked here by SIP / privilege limits, while `xctrace`
+   is available only as a supporting tool.
+6. the stock introspection runtime is sufficient on this host to classify
+   default-root source traffic, default-overcommit main-queue handoff traffic,
+   and worker-request rates for the M14 seam;
+7. the local matched `64 x 8 x 20ms` run lands the Swift steady-state
+   `mainq -> default.overcommit` rate at about `2.04 / round` on macOS,
+   versus the FreeBSD reference `3.21 / round`, while the C control lane
+   stays at `0 / round`.
+
+Current consequence:
+
+1. the repo now has both a stock-symbol reality lane and a stock-binary
+   introspection lane for matched M14 comparison runs;
+2. this host can answer the seam question without a custom libdispatch build:
+   the Swift main-queue cleanup handoff shape is native on macOS too;
+3. the remaining FreeBSD/macOS delta is closer to “about 1.5x” than to a
+   “2x lower” macOS result, so this seam should not get more FreeBSD-side
+   tuning by default;
+4. a custom-build counter path remains the fallback only if some later M14
+   question needs deeper attribution than stock introspection can provide.
+
 ### M13 DTrace lane now identifies default-overcommit traffic safely
 
 The root-push classifier boundary has been made usable instead of just

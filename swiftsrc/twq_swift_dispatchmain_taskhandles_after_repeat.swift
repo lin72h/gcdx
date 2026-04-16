@@ -1,5 +1,9 @@
 import Dispatch
+#if canImport(Darwin)
+import Darwin
+#else
 import Glibc
+#endif
 
 @_silgen_name("sysctlbyname")
 private func c_sysctlbyname(
@@ -15,6 +19,37 @@ private struct TwqRoundCounters {
   let threadEnterCount: UInt64
   let threadReturnCount: UInt64
 }
+
+private struct TwqDispatchCounters {
+  var rootPushTotalDefault: UInt64
+  var rootPushEmptyDefault: UInt64
+  var rootPushSourceDefault: UInt64
+  var rootPushContinuationDefault: UInt64
+  var rootPokeSlowDefault: UInt64
+  var rootRequestedThreadsDefault: UInt64
+  var rootPushTotalDefaultOvercommit: UInt64
+  var rootPushEmptyDefaultOvercommit: UInt64
+  var rootPushMainqDefaultOvercommit: UInt64
+  var rootPushContinuationDefaultOvercommit: UInt64
+  var rootPokeSlowDefaultOvercommit: UInt64
+  var rootRequestedThreadsDefaultOvercommit: UInt64
+  var pthreadWorkqueueAddthreadsCalls: UInt64
+  var pthreadWorkqueueAddthreadsRequestedThreads: UInt64
+}
+
+@_silgen_name("twq_macos_dispatch_introspection_install")
+private func twqDispatchIntrospectionInstall() -> Int32
+
+@_silgen_name("twq_macos_dispatch_introspection_available")
+private func twqDispatchIntrospectionAvailable() -> Int32
+
+@_silgen_name("twq_macos_dispatch_introspection_snapshot")
+private func twqDispatchIntrospectionSnapshot(
+  _ out: UnsafeMutablePointer<TwqDispatchCounters>
+) -> Int32
+
+@_silgen_name("twq_macos_dispatch_introspection_last_error")
+private func twqDispatchIntrospectionLastError() -> UnsafePointer<CChar>?
 
 private func emit(_ status: String, _ data: String) {
   let line =
@@ -47,6 +82,7 @@ private func readSysctlU64(_ name: String) -> (UInt64?, CInt) {
 }
 
 private func readTwqRoundCounters() -> (TwqRoundCounters?, CInt) {
+#if os(FreeBSD)
   let (reqthreads, reqErr) = readSysctlU64("kern.twq.reqthreads_count")
   if let reqthreads {
     let (threadEnter, enterErr) = readSysctlU64("kern.twq.thread_enter_count")
@@ -67,6 +103,9 @@ private func readTwqRoundCounters() -> (TwqRoundCounters?, CInt) {
     return (nil, enterErr)
   }
   return (nil, reqErr)
+#else
+  return (nil, ENOTSUP)
+#endif
 }
 
 private func emitRoundCounters(
@@ -109,6 +148,65 @@ private func envInt(_ name: String, default value: Int) -> Int {
   return parsed
 }
 
+private func emitDispatchCounters(
+  mode: String,
+  phase: String,
+  round: Int,
+  completedRounds: Int,
+  counters: TwqDispatchCounters,
+  startCounters: TwqDispatchCounters? = nil
+) {
+  emit(
+    "progress",
+    "\"mode\":\"\(mode)\",\"phase\":\"\(phase)\",\"round\":\(round),\"completed_rounds\":\(completedRounds)," +
+      "\"root_push_total_default\":\(counters.rootPushTotalDefault)," +
+      "\"root_push_empty_default\":\(counters.rootPushEmptyDefault)," +
+      "\"root_push_source_default\":\(counters.rootPushSourceDefault)," +
+      "\"root_push_continuation_default\":\(counters.rootPushContinuationDefault)," +
+      "\"root_poke_slow_default\":\(counters.rootPokeSlowDefault)," +
+      "\"root_requested_threads_default\":\(counters.rootRequestedThreadsDefault)," +
+      "\"root_push_total_default_overcommit\":\(counters.rootPushTotalDefaultOvercommit)," +
+      "\"root_push_empty_default_overcommit\":\(counters.rootPushEmptyDefaultOvercommit)," +
+      "\"root_push_mainq_default_overcommit\":\(counters.rootPushMainqDefaultOvercommit)," +
+      "\"root_push_continuation_default_overcommit\":\(counters.rootPushContinuationDefaultOvercommit)," +
+      "\"root_poke_slow_default_overcommit\":\(counters.rootPokeSlowDefaultOvercommit)," +
+      "\"root_requested_threads_default_overcommit\":\(counters.rootRequestedThreadsDefaultOvercommit)," +
+      "\"pthread_workqueue_addthreads_calls\":\(counters.pthreadWorkqueueAddthreadsCalls)," +
+      "\"pthread_workqueue_addthreads_requested_threads\":\(counters.pthreadWorkqueueAddthreadsRequestedThreads)"
+  )
+
+  guard let startCounters else {
+    return
+  }
+
+  emit(
+    "progress",
+    "\"mode\":\"\(mode)\",\"phase\":\"\(phase)-delta\",\"round\":\(round),\"completed_rounds\":\(completedRounds)," +
+      "\"root_push_total_default\":\(counters.rootPushTotalDefault - startCounters.rootPushTotalDefault)," +
+      "\"root_push_empty_default\":\(counters.rootPushEmptyDefault - startCounters.rootPushEmptyDefault)," +
+      "\"root_push_source_default\":\(counters.rootPushSourceDefault - startCounters.rootPushSourceDefault)," +
+      "\"root_push_continuation_default\":\(counters.rootPushContinuationDefault - startCounters.rootPushContinuationDefault)," +
+      "\"root_poke_slow_default\":\(counters.rootPokeSlowDefault - startCounters.rootPokeSlowDefault)," +
+      "\"root_requested_threads_default\":\(counters.rootRequestedThreadsDefault - startCounters.rootRequestedThreadsDefault)," +
+      "\"root_push_total_default_overcommit\":\(counters.rootPushTotalDefaultOvercommit - startCounters.rootPushTotalDefaultOvercommit)," +
+      "\"root_push_empty_default_overcommit\":\(counters.rootPushEmptyDefaultOvercommit - startCounters.rootPushEmptyDefaultOvercommit)," +
+      "\"root_push_mainq_default_overcommit\":\(counters.rootPushMainqDefaultOvercommit - startCounters.rootPushMainqDefaultOvercommit)," +
+      "\"root_push_continuation_default_overcommit\":\(counters.rootPushContinuationDefaultOvercommit - startCounters.rootPushContinuationDefaultOvercommit)," +
+      "\"root_poke_slow_default_overcommit\":\(counters.rootPokeSlowDefaultOvercommit - startCounters.rootPokeSlowDefaultOvercommit)," +
+      "\"root_requested_threads_default_overcommit\":\(counters.rootRequestedThreadsDefaultOvercommit - startCounters.rootRequestedThreadsDefaultOvercommit)," +
+      "\"pthread_workqueue_addthreads_calls\":\(counters.pthreadWorkqueueAddthreadsCalls - startCounters.pthreadWorkqueueAddthreadsCalls)," +
+      "\"pthread_workqueue_addthreads_requested_threads\":\(counters.pthreadWorkqueueAddthreadsRequestedThreads - startCounters.pthreadWorkqueueAddthreadsRequestedThreads)"
+  )
+}
+
+private func monotonicNowNs() -> UInt64 {
+  var ts = timespec()
+  guard clock_gettime(CLOCK_MONOTONIC, &ts) == 0 else {
+    return 0
+  }
+  return UInt64(ts.tv_sec) * 1_000_000_000 + UInt64(ts.tv_nsec)
+}
+
 @main
 struct Main {
   static func main() {
@@ -117,21 +215,52 @@ struct Main {
     let delayMs = envInt("TWQ_REPEAT_DELAY_MS", default: 20)
     let debugFirstRound = envInt("TWQ_REPEAT_DEBUG_FIRST_ROUND", default: 0) != 0
     let roundSum = tasks * (tasks - 1) / 2
+    let dispatchCountersAvailable =
+      twqDispatchIntrospectionInstall() == 0 && twqDispatchIntrospectionAvailable() != 0
 
     emit(
       "progress",
-      "\"mode\":\"dispatchmain-taskhandles-after-repeat\",\"phase\":\"before-spawn\",\"rounds\":\(rounds),\"tasks\":\(tasks),\"delay_ms\":\(delayMs)"
+      "\"mode\":\"dispatchmain-taskhandles-after-repeat\",\"phase\":\"before-spawn\",\"rounds\":\(rounds),\"tasks\":\(tasks),\"delay_ms\":\(delayMs),\"dispatch_introspection_available\":\(dispatchCountersAvailable ? "true" : "false")"
     )
+    if !dispatchCountersAvailable, let error = twqDispatchIntrospectionLastError() {
+      emit(
+        "progress",
+        "\"mode\":\"dispatchmain-taskhandles-after-repeat\",\"phase\":\"dispatch-introspection-error\",\"message\":\"\(String(cString: error))\""
+      )
+    }
 
     Task {
       var completedRounds = 0
       var totalSum = 0
+      var roundStartDispatchCounters = TwqDispatchCounters(
+        rootPushTotalDefault: 0,
+        rootPushEmptyDefault: 0,
+        rootPushSourceDefault: 0,
+        rootPushContinuationDefault: 0,
+        rootPokeSlowDefault: 0,
+        rootRequestedThreadsDefault: 0,
+        rootPushTotalDefaultOvercommit: 0,
+        rootPushEmptyDefaultOvercommit: 0,
+        rootPushMainqDefaultOvercommit: 0,
+        rootPushContinuationDefaultOvercommit: 0,
+        rootPokeSlowDefaultOvercommit: 0,
+        rootRequestedThreadsDefaultOvercommit: 0,
+        pthreadWorkqueueAddthreadsCalls: 0,
+        pthreadWorkqueueAddthreadsRequestedThreads: 0
+      )
 
       for round in 0..<rounds {
         let (roundStartCounters, roundStartError) = readTwqRoundCounters()
+        let roundStartNs = monotonicNowNs()
+        if dispatchCountersAvailable {
+          var snapshot = roundStartDispatchCounters
+          if twqDispatchIntrospectionSnapshot(&snapshot) == 0 {
+            roundStartDispatchCounters = snapshot
+          }
+        }
         emit(
           "progress",
-          "\"mode\":\"dispatchmain-taskhandles-after-repeat\",\"phase\":\"round-start\",\"round\":\(round),\"completed_rounds\":\(completedRounds)"
+          "\"mode\":\"dispatchmain-taskhandles-after-repeat\",\"phase\":\"round-start\",\"round\":\(round),\"completed_rounds\":\(completedRounds),\"ts_ns\":\(roundStartNs)"
         )
         emitRoundCounters(
           mode: "dispatchmain-taskhandles-after-repeat",
@@ -141,6 +270,15 @@ struct Main {
           counters: roundStartCounters,
           error: roundStartError
         )
+        if dispatchCountersAvailable {
+          emitDispatchCounters(
+            mode: "dispatchmain-taskhandles-after-repeat",
+            phase: "round-start-counters",
+            round: round,
+            completedRounds: completedRounds,
+            counters: roundStartDispatchCounters
+          )
+        }
 
         let handles = (0..<tasks).map { i in
           Task<Int, Never> {
@@ -150,7 +288,7 @@ struct Main {
                 "\"mode\":\"dispatchmain-taskhandles-after-repeat\",\"phase\":\"child-start\",\"round\":0,\"task\":\(i)"
               )
             }
-            await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
+            _ = await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
               DispatchQueue.global(qos: .default).asyncAfter(deadline: .now() + .milliseconds(delayMs)) {
                 if debugFirstRound && round == 0 {
                   emit(
@@ -192,9 +330,10 @@ struct Main {
         completedRounds += 1
         totalSum += sum
         let (roundEndCounters, roundEndError) = readTwqRoundCounters()
+        let roundEndNs = monotonicNowNs()
         emit(
           "progress",
-          "\"mode\":\"dispatchmain-taskhandles-after-repeat\",\"phase\":\"round-ok\",\"round\":\(round),\"round_sum\":\(sum),\"expected_round_sum\":\(roundSum),\"completed_rounds\":\(completedRounds),\"total_sum\":\(totalSum)"
+          "\"mode\":\"dispatchmain-taskhandles-after-repeat\",\"phase\":\"round-ok\",\"round\":\(round),\"round_sum\":\(sum),\"expected_round_sum\":\(roundSum),\"completed_rounds\":\(completedRounds),\"total_sum\":\(totalSum),\"elapsed_ns\":\(roundEndNs - roundStartNs),\"ts_ns\":\(roundEndNs)"
         )
         emitRoundCounters(
           mode: "dispatchmain-taskhandles-after-repeat",
@@ -205,6 +344,19 @@ struct Main {
           error: roundStartCounters != nil ? roundEndError : roundStartError,
           startCounters: roundStartCounters
         )
+        if dispatchCountersAvailable {
+          var roundEndDispatchCounters = roundStartDispatchCounters
+          if twqDispatchIntrospectionSnapshot(&roundEndDispatchCounters) == 0 {
+            emitDispatchCounters(
+              mode: "dispatchmain-taskhandles-after-repeat",
+              phase: "round-ok-counters",
+              round: round,
+              completedRounds: completedRounds,
+              counters: roundEndDispatchCounters,
+              startCounters: roundStartDispatchCounters
+            )
+          }
+        }
       }
 
       emit(
