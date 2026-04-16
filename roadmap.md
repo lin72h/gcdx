@@ -1222,6 +1222,152 @@ Current progress:
     `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260413T115538Z.json`,
     and
     `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260413T115743Z.json`.
+20. root-only tracing in
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260415T095603Z.serial.log`
+    now shows that the earliest repeat-lane overcommit request is sourced by
+    `_dispatch_queue_cleanup2()` re-enqueuing `com.apple.main-thread` onto
+    `com.apple.root.default-qos.overcommit` as an `empty->poke` root item.
+21. a donor-side comparison against
+    `../nx/apple-opensource-libdispatch/src/queue.c` and
+    `../nx/apple-opensource-libdispatch/src/inline_internal.h`
+    now says that seam is probably native-shaped:
+    Apple’s open `libdispatch` points `_dispatch_main_q` at
+    `_dispatch_get_default_queue(true)`, and `_dispatch_queue_cleanup2()`
+    immediately hands off through `_dispatch_lane_barrier_complete()`.
+22. that changes the next M13 target again:
+    the existence of the `cleanup2 -> overcommit root` handoff is no longer
+    the main suspect; the honest target is now excess overcommit redrive rate
+    and weak coalescing after the first cleanup-triggered handoff.
+23. a follow-up `libthr` analysis found that the runtime was still too
+    spawn-biased:
+    lane admission was being translated into `spawn_needed` even when
+    same-lane idle workers or transferable idle workers already existed.
+24. `/usr/src/lib/libthr/thread/thr_workq.c` now tracks per-lane idle workers
+    (`tbr_idle`) and uses a wake-first planning step in both the `addthreads`
+    path and reaper-driven redrive:
+    same-lane idle workers are used first, then transferable idle workers, and
+    only the remainder is spawned.
+25. two clean repeat-only runs at
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260415T110916Z.json`
+    and
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260415T111107Z.json`
+    kept the C repeat lane stable while improving the Swift repeat lane to
+    `+1350 / +429 / +426` and `+1279 / +394 / +391`.
+26. the next honest M13 question is now narrower than “optimize libdispatch”
+    or “optimize libthr” in the abstract:
+    a trace-enabled repeat lane should quantify the remaining wake/spawn mix
+    before the next behavioral patch is chosen.
+27. `scripts/bhyve/stage-guest.sh` now supports split trace controls for
+    `TWQ_LIBPTHREAD_TRACE`,
+    `TWQ_LIBDISPATCH_MAINQUEUE_TRACE`, and
+    `TWQ_LIBDISPATCH_ROOT_TRACE`, so `libthr` tracing no longer requires the
+    noisier bundled `TWQ_SWIFT_RUNTIME_TRACE` path.
+28. the new `libthr`-only traced run at
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260415T111903Z.serial.log`
+    and
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260415T111903Z.json`
+    completed successfully and showed the remaining repeat-lane requests are
+    overwhelmingly wake-dominant:
+    dispatch had `118` wake-only versus `5` spawn-only `addthreads-ready`
+    events, and Swift had `456` wake-only versus `7` spawn-only.
+29. that is the next real decision point:
+    `libthr` wake-first planning is now proven enough that the next behavioral
+    reduction should return to staged-`libdispatch` request generation and
+    coalescing, with the new low-noise `libthr` trace lane kept as a
+    regression guard.
+30. a narrower staged-`libdispatch` follow-up then tried deferring the root
+    poke only for single queue-object pushes back onto the same root worker.
+31. that branch was rejected and reverted after two clean repeat-only runs:
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260415T124521Z.json`
+    looked promising at
+    `dispatch +343 / +155 / +152` and
+    `swift +1184 / +362 / +359`,
+    but the confirmation run at
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260415T124736Z.json`
+    regressed to
+    `dispatch +432 / +187 / +184` and
+    `swift +1532 / +506 / +503`.
+32. the first improved sample is now treated as timing luck, not as a valid
+    new M13 baseline.
+33. the next staged-`libdispatch` pass then stopped trying to coalesce all
+    root redrive generically and instead suppressed
+    `_dispatch_root_queue_drain_one() -> _dispatch_root_queue_poke(dq, 1, 0)`
+    only for one-shot `dispatch_after` timer sources on the non-overcommit
+    default root.
+34. the first clean proof run,
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260415T134322Z.json`,
+    kept both repeat lanes correct while improving
+    `dispatch.main-executor-resume-repeat` to
+    `+324 / +153 / +150`
+    and
+    `swift.dispatchmain-taskhandles-after-repeat` to
+    `+1234 / +408 / +405`.
+35. the corresponding counter dump proves the source seam was real:
+    Swift dropped to
+    `root_repoke_default=0`,
+    `root_repoke_drain_one_default=0`,
+    with
+    `root_repoke_suppressed_after_source_default=363`.
+36. the follow-up classification run,
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260415T134625Z.json`,
+    kept that source suppression result and improved Swift again to
+    `+1137 / +386 / +383`,
+    while holding the C lane in the same improved band at
+    `+329 / +153 / +150`.
+37. after source suppression, the remaining C default-root repoke tail is now
+    explicit:
+    `root_repoke_drain_one_kind_default_continuation=443`,
+    `root_repoke_drain_one_kind_default_continuation_async_redirect=443`,
+    and
+    `root_repoke_drain_one_kind_default_lane=55`,
+    so the next honest M13 target is the default-root `ASYNC_REDIRECT`
+    continuation path, not generic root repoke policy.
+38. an attempted in-process classifier for default-overcommit root-push object
+    kinds was rejected after it produced Swift repeat `rc=139` failures:
+    the classifier dereferenced the pushed object after `os_mpsc_push_list()`
+    had published it to the root queue, so a concurrent drainer could recycle
+    it before `dx_metatype()` read the vtable.
+39. that unsafe classifier was reverted while keeping the proven source and
+    `ASYNC_REDIRECT` suppression changes; the focused stability run at
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-baseline-20260416T024756Z.json`
+    completed the Swift repeat lane at
+    `reqthreads +969 / enter +317 / return +314`.
+40. FreeBSD DTrace is now the preferred tool for the next diagnostic seam:
+    scripts under `scripts/dtrace/` trace `_dispatch_root_queue_push:entry`,
+    `_dispatch_root_queue_poke*`, `_dispatch_continuation_pop`,
+    `_dispatch_queue_cleanup2`, and `_dispatch_async_redirect_invoke` without
+    mutating the hot path.
+41. `scripts/bhyve/stage-guest.sh` stages those scripts into the guest under
+    `/root/twq-dtrace`, so future repeat-lane runs can classify push
+    populations before the MPSC publish boundary.
+42. `hwpmc` is recorded as a later M13/M14 performance attribution tool for
+    bare-metal cost analysis after DTrace has identified the semantic hot path;
+    it is not the right tool for pointer-safety or queue-ownership bugs.
+43. the DTrace runner now targets the real probe process instead of
+    `/usr/bin/env`, which makes the exported staged-`libdispatch`
+    `_dispatch_twq_dtrace_*` shims reliable in bhyve runs.
+44. a fresh `push-vtable` DTrace run at
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-dtrace-push-vtable-20260416T042209Z.serial.log`
+    shows the default-overcommit root receiving main-queue objects, while the
+    default root receives timer sources and the user-initiated root receives
+    Swift/global continuation traffic.
+45. staged `libdispatch` now keeps only a narrow safe push-path classifier:
+    pointer equality against `_dispatch_main_q` before MPSC publication. It
+    does not decode arbitrary pushed objects on the hot path.
+46. the full Swift repeat counter run at
+    `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-swift-repeat-counters-20260416T041819Z.json`
+    completed at `reqthreads +1058 / enter +343 / return +340`, with
+    `root_push_empty_default_overcommit=186` matching
+    `root_push_mainq_default_overcommit=186`.
+47. the current M13 conclusion is therefore narrower:
+    default-overcommit pressure in the Swift repeat lane is main-queue handoff
+    traffic and appears native-shaped. The next tuning decision should compare
+    rate and coalescing against macOS before suppressing it.
+48. `scripts/benchmarks/extract-m13-baseline.py` now emits schema version `2`
+    and preserves libdispatch counter dumps alongside TWQ deltas.
+49. `scripts/benchmarks/summarize-m13-baseline.py` and
+    `scripts/benchmarks/compare-m13-baselines.py` are now the first practical
+    CLI tools for quick M13 triage and drift-tolerant regression comparison.
 
 Exit criteria:
 
@@ -1339,21 +1485,24 @@ Question:
 
 The highest-value next milestones are:
 
-1. M12: isolate and fix the staged `libdispatch` executor-after /
-   delayed-child bug at the C level
-2. M13: start locking in performance and regression discipline once the first
-   staged-dispatch correctness gap is closed
-3. M14: use native macOS as the comparison lane after the FreeBSD Swift gate
-   is trustworthy
+1. M13: reduce staged `libdispatch` repeat-lane churn at the root queue,
+   now that the counter-only guest runs show the active seam is
+   `_dispatch_root_queue_drain_one()` next-visible repoke on the default root
+   rather than concurrent-lane redirect
+2. M14: use native macOS as the comparison lane after the FreeBSD repeat-lane
+   behavior is stable enough to compare honestly
+3. M15: revisit deeper integration only after the root-redrive cost is either
+   reduced or shown to be structurally acceptable
 
 That order gives the project:
 
-1. a clear answer about whether the remaining boundary belongs to staged
-   `libdispatch` worker-request behavior rather than broader Swift or kernel
-   failure;
-2. a way to keep Swift-facing regressions honest without debugging them first
-   through Swift-only symptoms;
-3. a better foundation for later macOS comparison.
+1. a precise optimization target inside staged `libdispatch`, instead of
+   treating remaining churn as a generic worker-request problem;
+2. a way to keep Swift-facing regressions honest without confusing them with a
+   now-ruled-out concurrent-lane redirect hypothesis;
+3. a better foundation for later macOS comparison, because the comparison lane
+   is more useful after the FreeBSD side has an honest explanation for its own
+   repeat-lane root redrive.
 
 ## Bottom Line
 

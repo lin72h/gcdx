@@ -50,6 +50,13 @@ Environment:
   TWQ_LIBDISPATCH_STAGE_DIR Directory containing staged libdispatch libraries
   TWQ_SWIFT_STAGE_DIR       Directory containing staged Swift runtime libraries
   TWQ_SWIFT_STOCK_DISPATCH_STAGE_DIR Directory containing stock toolchain Dispatch libraries
+  TWQ_DTRACE_SCRIPT_DIR     Directory containing optional DTrace diagnostics
+  TWQ_DTRACE_MODE           Optional DTrace mode: push-poke-drain, push-vtable, root-summary
+  TWQ_DTRACE_TARGET         Optional DTrace target: swift-repeat or c-repeat
+  TWQ_DTRACE_TIMEOUT        Optional DTrace run timeout in seconds (default: 120)
+  TWQ_DTRACE_ROUNDS         Optional repeat rounds for DTrace target (default: 64)
+  TWQ_DTRACE_TASKS          Optional repeat tasks for DTrace target (default: 8)
+  TWQ_DTRACE_DELAY_MS       Optional repeat delay for DTrace target (default: 20)
   TWQ_SWIFT_CONCURRENCY_HOOK_TRACE_SO Shared library that installs Swift concurrency enqueue hooks
   TWQ_PREPARE_LIBTHR_STAGE  Optional non-empty value to refresh staged libthr before guest staging
   TWQ_PREPARE_LIBDISPATCH_STAGE Optional non-empty value to refresh staged libdispatch before guest staging
@@ -132,6 +139,13 @@ pthread_stage_dir=${TWQ_LIBPTHREAD_STAGE_DIR:-${repo_root}/../artifacts/libthr-s
 dispatch_stage_dir=${TWQ_LIBDISPATCH_STAGE_DIR:-${repo_root}/../artifacts/libdispatch-stage}
 swift_stage_dir=${TWQ_SWIFT_STAGE_DIR:-${repo_root}/../artifacts/swift-stage}
 swift_stock_dispatch_stage_dir=${TWQ_SWIFT_STOCK_DISPATCH_STAGE_DIR:-${repo_root}/../artifacts/swift-stock-dispatch-stage}
+dtrace_script_dir=${TWQ_DTRACE_SCRIPT_DIR:-${repo_root}/scripts/dtrace}
+dtrace_mode=${TWQ_DTRACE_MODE:-}
+dtrace_target=${TWQ_DTRACE_TARGET:-swift-repeat}
+dtrace_timeout=${TWQ_DTRACE_TIMEOUT:-120}
+dtrace_rounds=${TWQ_DTRACE_ROUNDS:-64}
+dtrace_tasks=${TWQ_DTRACE_TASKS:-8}
+dtrace_delay_ms=${TWQ_DTRACE_DELAY_MS:-20}
 prepare_libthr_stage=${TWQ_PREPARE_LIBTHR_STAGE:-}
 prepare_libdispatch_stage=${TWQ_PREPARE_LIBDISPATCH_STAGE:-}
 prepare_swift_stage=${TWQ_PREPARE_SWIFT_STAGE:-}
@@ -140,6 +154,11 @@ swift_probe_profile=${TWQ_SWIFT_PROBE_PROFILE:-validation}
 dispatch_probe_filter=${TWQ_DISPATCH_PROBE_FILTER:-}
 swift_probe_filter=${TWQ_SWIFT_PROBE_FILTER:-}
 swift_runtime_trace=${TWQ_SWIFT_RUNTIME_TRACE:-}
+libdispatch_counters=${TWQ_LIBDISPATCH_COUNTERS:-}
+libdispatch_queue_trace=${TWQ_LIBDISPATCH_QUEUE_TRACE:-}
+libdispatch_mainqueue_trace=${TWQ_LIBDISPATCH_MAINQUEUE_TRACE:-}
+libdispatch_root_trace=${TWQ_LIBDISPATCH_ROOT_TRACE:-}
+libpthread_trace=${TWQ_LIBPTHREAD_TRACE:-}
 
 if [ -z "$vm_image" ] || [ -z "$guest_root" ]; then
   echo "TWQ_VM_IMAGE and TWQ_GUEST_ROOT are required unless --dry-run is used" >&2
@@ -175,6 +194,30 @@ prepare_runtime_stage() {
 
   echo "Refreshing ${label} stage via ${script}" >&2
   env "$@" sh "$script"
+}
+
+stage_diagnostic_kernel_modules() {
+  modules_root=$(find "$kernel_objdirprefix" \
+    -path "*/sys/${kernel_conf}/modules/usr/src/sys/modules" \
+    -type d -print 2>/dev/null | head -n 1)
+
+  if [ -z "$modules_root" ]; then
+    echo "No built diagnostic kernel modules found for ${kernel_conf}; DTrace/hwpmc may be unavailable in the guest" >&2
+    return 0
+  fi
+
+  doas install -d -m 755 "$guest_root/boot/${kernel_conf}"
+  for module_file in \
+    "$modules_root"/opensolaris/opensolaris.ko \
+    "$modules_root"/dtrace/*/*.ko \
+    "$modules_root"/hwpmc/hwpmc.ko
+  do
+    [ -f "$module_file" ] || continue
+    doas install -m 555 "$module_file" \
+      "$guest_root/boot/${kernel_conf}/$(basename "$module_file")"
+  done
+
+  doas kldxref "$guest_root/boot/${kernel_conf}" >/dev/null 2>&1 || true
 }
 
 if [ "$dry_run" -eq 1 ]; then
@@ -224,6 +267,9 @@ copy staged custom libthr from ${pthread_stage_dir}
 copy staged libdispatch runtime from ${dispatch_stage_dir}
 copy staged Swift runtime from ${swift_stage_dir}
 copy stock toolchain Dispatch runtime from ${swift_stock_dispatch_stage_dir}
+copy DTrace diagnostics from ${dtrace_script_dir}
+write DTrace mode ${dtrace_mode}
+write DTrace target ${dtrace_target}
 write Swift probe profile ${swift_probe_profile}
 write dispatch probe filter ${dispatch_probe_filter}
 write Swift probe filter ${swift_probe_filter}
@@ -509,6 +555,7 @@ doas mount -o rw -t ufs "$root_part" "$guest_root"
 doas env MAKEOBJDIRPREFIX="$kernel_objdirprefix" make -C /usr/src installkernel \
   KERNCONF="$kernel_conf" INSTKERNNAME="$kernel_conf" NO_MODULES=yes \
   DESTDIR="$guest_root"
+stage_diagnostic_kernel_modules
 
 doas install -d -m 755 "$guest_root/root"
 doas install -m 755 "$probe_bin" "$guest_root/root/twq-probe-stub"
@@ -563,10 +610,38 @@ doas cp -a "$swift_stage_dir/." "$guest_root/root/twq-swift/"
 doas rm -rf "$guest_root/root/twq-stock-dispatch"
 doas mkdir -p "$guest_root/root/twq-stock-dispatch"
 doas cp -a "$swift_stock_dispatch_stage_dir/." "$guest_root/root/twq-stock-dispatch/"
+doas rm -rf "$guest_root/root/twq-dtrace"
+doas mkdir -p "$guest_root/root/twq-dtrace"
+if [ -d "$dtrace_script_dir" ]; then
+  for dtrace_file in "$dtrace_script_dir"/*; do
+    [ -f "$dtrace_file" ] || continue
+    case "$dtrace_file" in
+      *.d)
+        doas install -m 755 "$dtrace_file" \
+          "$guest_root/root/twq-dtrace/$(basename "$dtrace_file")"
+        ;;
+      *.md)
+        doas install -m 644 "$dtrace_file" \
+          "$guest_root/root/twq-dtrace/$(basename "$dtrace_file")"
+        ;;
+    esac
+  done
+fi
+printf '%s\n' "$dtrace_mode" | doas tee "$guest_root/root/twq-dtrace-mode" >/dev/null
+printf '%s\n' "$dtrace_target" | doas tee "$guest_root/root/twq-dtrace-target" >/dev/null
+printf '%s\n' "$dtrace_timeout" | doas tee "$guest_root/root/twq-dtrace-timeout" >/dev/null
+printf '%s\n' "$dtrace_rounds" | doas tee "$guest_root/root/twq-dtrace-rounds" >/dev/null
+printf '%s\n' "$dtrace_tasks" | doas tee "$guest_root/root/twq-dtrace-tasks" >/dev/null
+printf '%s\n' "$dtrace_delay_ms" | doas tee "$guest_root/root/twq-dtrace-delay-ms" >/dev/null
 printf '%s\n' "$swift_probe_profile" | doas tee "$guest_root/root/twq-swift-profile" >/dev/null
 printf '%s\n' "$dispatch_probe_filter" | doas tee "$guest_root/root/twq-dispatch-filter" >/dev/null
 printf '%s\n' "$swift_probe_filter" | doas tee "$guest_root/root/twq-swift-filter" >/dev/null
 printf '%s\n' "$swift_runtime_trace" | doas tee "$guest_root/root/twq-swift-runtime-trace" >/dev/null
+printf '%s\n' "$libdispatch_counters" | doas tee "$guest_root/root/twq-libdispatch-counters" >/dev/null
+printf '%s\n' "$libdispatch_queue_trace" | doas tee "$guest_root/root/twq-libdispatch-queue-trace" >/dev/null
+printf '%s\n' "$libdispatch_mainqueue_trace" | doas tee "$guest_root/root/twq-libdispatch-mainqueue-trace" >/dev/null
+printf '%s\n' "$libdispatch_root_trace" | doas tee "$guest_root/root/twq-libdispatch-root-trace" >/dev/null
+printf '%s\n' "$libpthread_trace" | doas tee "$guest_root/root/twq-libpthread-trace" >/dev/null
 
 tmp_run=$(mktemp)
 cat > "$tmp_run" <<'EOF'
@@ -640,6 +715,61 @@ if [ -r /root/twq-swift-runtime-trace ]; then
   swift_runtime_trace=$(cat /root/twq-swift-runtime-trace)
 fi
 
+libdispatch_counters=
+if [ -r /root/twq-libdispatch-counters ]; then
+  libdispatch_counters=$(cat /root/twq-libdispatch-counters)
+fi
+
+libdispatch_queue_trace=
+if [ -r /root/twq-libdispatch-queue-trace ]; then
+  libdispatch_queue_trace=$(cat /root/twq-libdispatch-queue-trace)
+fi
+
+libdispatch_mainqueue_trace=
+if [ -r /root/twq-libdispatch-mainqueue-trace ]; then
+  libdispatch_mainqueue_trace=$(cat /root/twq-libdispatch-mainqueue-trace)
+fi
+
+libdispatch_root_trace=
+if [ -r /root/twq-libdispatch-root-trace ]; then
+  libdispatch_root_trace=$(cat /root/twq-libdispatch-root-trace)
+fi
+
+libpthread_trace=
+if [ -r /root/twq-libpthread-trace ]; then
+  libpthread_trace=$(cat /root/twq-libpthread-trace)
+fi
+
+dtrace_mode=
+if [ -r /root/twq-dtrace-mode ]; then
+  dtrace_mode=$(cat /root/twq-dtrace-mode)
+fi
+
+dtrace_target=swift-repeat
+if [ -r /root/twq-dtrace-target ]; then
+  dtrace_target=$(cat /root/twq-dtrace-target)
+fi
+
+dtrace_timeout=120
+if [ -r /root/twq-dtrace-timeout ]; then
+  dtrace_timeout=$(cat /root/twq-dtrace-timeout)
+fi
+
+dtrace_rounds=64
+if [ -r /root/twq-dtrace-rounds ]; then
+  dtrace_rounds=$(cat /root/twq-dtrace-rounds)
+fi
+
+dtrace_tasks=8
+if [ -r /root/twq-dtrace-tasks ]; then
+  dtrace_tasks=$(cat /root/twq-dtrace-tasks)
+fi
+
+dtrace_delay_ms=20
+if [ -r /root/twq-dtrace-delay-ms ]; then
+  dtrace_delay_ms=$(cat /root/twq-dtrace-delay-ms)
+fi
+
 swift_runtime_root=/root/twq-swift/usr/lib/swift/freebsd
 swift_twq_ld=/root/twq-dispatch:${swift_runtime_root}:/root/twq-lib
 swift_twq_stockthr_ld=/root/twq-dispatch:${swift_runtime_root}
@@ -648,10 +778,37 @@ swift_stock_dispatch_customthr_ld=/root/twq-stock-dispatch:${swift_runtime_root}
 
 swift_trace_env()
 {
+  effective_swift_trace=${swift_runtime_trace}
+  effective_counters=${libdispatch_counters}
+  effective_queue_trace=${libdispatch_queue_trace}
+  effective_mainqueue_trace=${libdispatch_mainqueue_trace}
+  effective_root_trace=${libdispatch_root_trace}
+  effective_pthread_trace=${libpthread_trace}
+
   if [ -n "${swift_runtime_trace}" ]; then
-    env SWIFT_TWQ_TRACE_CONCURRENCY="${swift_runtime_trace}" \
-      LIBDISPATCH_TWQ_TRACE_MAINQUEUE="${swift_runtime_trace}" \
-      LIBPTHREAD_TWQ_TRACE="${swift_runtime_trace}" "$@"
+    if [ -z "${effective_queue_trace}" ]; then
+      effective_queue_trace=${swift_runtime_trace}
+    fi
+    if [ -z "${effective_mainqueue_trace}" ]; then
+      effective_mainqueue_trace=${swift_runtime_trace}
+    fi
+    if [ -z "${effective_root_trace}" ]; then
+      effective_root_trace=${swift_runtime_trace}
+    fi
+    if [ -z "${effective_pthread_trace}" ]; then
+      effective_pthread_trace=${swift_runtime_trace}
+    fi
+  fi
+
+  if [ -n "${effective_swift_trace}${effective_counters}${effective_queue_trace}${effective_mainqueue_trace}${effective_root_trace}${effective_pthread_trace}" ]; then
+    env \
+      ${effective_swift_trace:+SWIFT_TWQ_TRACE_CONCURRENCY=${effective_swift_trace}} \
+      ${effective_counters:+LIBDISPATCH_TWQ_COUNTERS=${effective_counters}} \
+      ${effective_queue_trace:+LIBDISPATCH_TWQ_TRACE_QUEUE=${effective_queue_trace}} \
+      ${effective_mainqueue_trace:+LIBDISPATCH_TWQ_TRACE_MAINQUEUE=${effective_mainqueue_trace}} \
+      ${effective_root_trace:+LIBDISPATCH_TWQ_TRACE_ROOT=${effective_root_trace}} \
+      ${effective_pthread_trace:+LIBPTHREAD_TWQ_TRACE=${effective_pthread_trace}} \
+      "$@"
   else
     "$@"
   fi
@@ -659,9 +816,35 @@ swift_trace_env()
 
 dispatch_trace_env()
 {
+  effective_counters=${libdispatch_counters}
+  effective_queue_trace=${libdispatch_queue_trace}
+  effective_mainqueue_trace=${libdispatch_mainqueue_trace}
+  effective_root_trace=${libdispatch_root_trace}
+  effective_pthread_trace=${libpthread_trace}
+
   if [ -n "${swift_runtime_trace}" ]; then
-    env LIBDISPATCH_TWQ_TRACE_MAINQUEUE="${swift_runtime_trace}" \
-      LIBPTHREAD_TWQ_TRACE="${swift_runtime_trace}" "$@"
+    if [ -z "${effective_queue_trace}" ]; then
+      effective_queue_trace=${swift_runtime_trace}
+    fi
+    if [ -z "${effective_mainqueue_trace}" ]; then
+      effective_mainqueue_trace=${swift_runtime_trace}
+    fi
+    if [ -z "${effective_root_trace}" ]; then
+      effective_root_trace=${swift_runtime_trace}
+    fi
+    if [ -z "${effective_pthread_trace}" ]; then
+      effective_pthread_trace=${swift_runtime_trace}
+    fi
+  fi
+
+  if [ -n "${effective_counters}${effective_queue_trace}${effective_mainqueue_trace}${effective_root_trace}${effective_pthread_trace}" ]; then
+    env \
+      ${effective_counters:+LIBDISPATCH_TWQ_COUNTERS=${effective_counters}} \
+      ${effective_queue_trace:+LIBDISPATCH_TWQ_TRACE_QUEUE=${effective_queue_trace}} \
+      ${effective_mainqueue_trace:+LIBDISPATCH_TWQ_TRACE_MAINQUEUE=${effective_mainqueue_trace}} \
+      ${effective_root_trace:+LIBDISPATCH_TWQ_TRACE_ROOT=${effective_root_trace}} \
+      ${effective_pthread_trace:+LIBPTHREAD_TWQ_TRACE=${effective_pthread_trace}} \
+      "$@"
   else
     "$@"
   fi
@@ -758,6 +941,95 @@ log=/var/log/twq-probe.log
   fi
   echo "=== twq dispatch filter end ==="
   sysctl kern.twq.busy_window_usecs=50000
+  if [ -n "${dtrace_mode}" ]; then
+    echo "=== twq dtrace mode ==="
+    echo "${dtrace_mode}"
+    echo "=== twq dtrace mode end ==="
+    echo "=== twq dtrace target ==="
+    echo "${dtrace_target}"
+    echo "=== twq dtrace target end ==="
+    echo "=== twq dtrace stats before ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count \
+      kern.twq.bucket_total_current \
+      kern.twq.bucket_idle_current \
+      kern.twq.bucket_active_current
+    echo "=== twq dtrace stats before end ==="
+
+    case "${dtrace_mode}" in
+      push-poke-drain)
+        dtrace_script=/root/twq-dtrace/m13-push-poke-drain.d
+        ;;
+      push-vtable)
+        dtrace_script=/root/twq-dtrace/m13-push-vtable.d
+        ;;
+      root-summary)
+        dtrace_script=/root/twq-dtrace/m13-root-summary.d
+        ;;
+      *)
+        echo "Unsupported DTrace mode: ${dtrace_mode}" >&2
+        exit 64
+        ;;
+    esac
+
+    if [ ! -r "${dtrace_script}" ]; then
+      echo "DTrace script not found: ${dtrace_script}" >&2
+      exit 66
+    fi
+
+    dtrace_env=
+    case "${dtrace_target}" in
+      swift-repeat)
+        dtrace_env="LD_LIBRARY_PATH=${swift_twq_ld} LIBDISPATCH_TWQ_DTRACE_PROBES=1 TWQ_REPEAT_ROUNDS=${dtrace_rounds} TWQ_REPEAT_TASKS=${dtrace_tasks} TWQ_REPEAT_DELAY_MS=${dtrace_delay_ms} TWQ_REPEAT_DEBUG_FIRST_ROUND=1"
+        dtrace_command="/root/twq-swift-dispatchmain-taskhandles-after-repeat"
+        ;;
+      c-repeat)
+        dtrace_env="LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib LIBDISPATCH_TWQ_DTRACE_PROBES=1"
+        dtrace_command="/root/twq-dispatch-probe --mode main-executor-resume-repeat --rounds ${dtrace_rounds} --tasks ${dtrace_tasks} --sleep-ms ${dtrace_delay_ms}"
+        ;;
+      *)
+        echo "Unsupported DTrace target: ${dtrace_target}" >&2
+        exit 64
+        ;;
+    esac
+
+    echo "=== twq dtrace command ==="
+    echo "env ${dtrace_env} ${dtrace_command}"
+    echo "=== twq dtrace command end ==="
+    kldload dtraceall 2>/dev/null || true
+    dtrace_rc=0
+    run_with_timeout "${dtrace_timeout}" env ${dtrace_env} dtrace -Z -x nolibs -x evaltime=main -q -s "${dtrace_script}" -c "${dtrace_command}"
+    dtrace_rc=${RUN_WITH_TIMEOUT_STATUS}
+    if [ "${RUN_WITH_TIMEOUT_TIMED_OUT}" -ne 0 ]; then
+      dtrace_rc=124
+      echo "{\"kind\":\"dtrace-probe\",\"status\":\"timeout\",\"data\":{\"mode\":\"${dtrace_mode}\",\"target\":\"${dtrace_target}\",\"timed_out\":true,\"timeout_sec\":${dtrace_timeout}},\"meta\":{\"component\":\"dtrace\"}}"
+    elif [ "${dtrace_rc}" -ne 0 ]; then
+      echo "{\"kind\":\"dtrace-probe\",\"status\":\"error\",\"data\":{\"mode\":\"${dtrace_mode}\",\"target\":\"${dtrace_target}\",\"timed_out\":false,\"rc\":${dtrace_rc}},\"meta\":{\"component\":\"dtrace\"}}"
+    else
+      echo "{\"kind\":\"dtrace-probe\",\"status\":\"ok\",\"data\":{\"mode\":\"${dtrace_mode}\",\"target\":\"${dtrace_target}\",\"rounds\":${dtrace_rounds},\"tasks\":${dtrace_tasks},\"delay_ms\":${dtrace_delay_ms}},\"meta\":{\"component\":\"dtrace\"}}"
+    fi
+    echo "=== twq dtrace probe end ==="
+    echo "=== twq dtrace stats after ==="
+    sysctl kern.twq.init_count \
+      kern.twq.setup_dispatch_count \
+      kern.twq.reqthreads_count \
+      kern.twq.thread_enter_count \
+      kern.twq.thread_return_count \
+      kern.twq.bucket_total_current \
+      kern.twq.bucket_idle_current \
+      kern.twq.bucket_active_current
+    echo "=== twq dtrace stats after end ==="
+    if [ "${dtrace_rc}" -ne 0 ]; then
+      echo "=== twq dtrace failure rc ==="
+      echo "${dtrace_rc}"
+      echo "=== twq dtrace failure rc end ==="
+    fi
+    echo "=== twq probe end ==="
+    exit 0
+  fi
   /root/twq-probe-stub --sequence basic --count 2
   /root/twq-probe-stub --sequence pressure
   /root/twq-probe-stub --sequence entered-pressure

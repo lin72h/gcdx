@@ -19,6 +19,12 @@ Environment:
   TWQ_M13_DISPATCH_FILTER Comma-separated dispatch probe filter
   TWQ_M13_SWIFT_FILTER    Comma-separated Swift probe filter
   TWQ_M13_SWIFT_PROFILE   Swift profile for guest run (default: full)
+  TWQ_DTRACE_MODE         Optional DTrace mode: push-poke-drain, push-vtable, root-summary
+  TWQ_DTRACE_TARGET       Optional DTrace target: swift-repeat or c-repeat
+  TWQ_DTRACE_TIMEOUT      Optional DTrace run timeout in seconds
+  TWQ_DTRACE_ROUNDS       Optional repeat rounds for DTrace target
+  TWQ_DTRACE_TASKS        Optional repeat tasks for DTrace target
+  TWQ_DTRACE_DELAY_MS     Optional repeat delay for DTrace target
 EOF
 }
 
@@ -48,6 +54,12 @@ benchmark_label=${TWQ_BENCHMARK_LABEL:-m13-initial}
 dispatch_filter=${TWQ_M13_DISPATCH_FILTER:-basic,pressure,burst-reuse,timeout-gap,sustained,main-executor-resume-repeat}
 swift_filter=${TWQ_M13_SWIFT_FILTER:-dispatch-control,mainqueue-resume,dispatchmain-taskhandles-after-repeat}
 swift_profile=${TWQ_M13_SWIFT_PROFILE:-full}
+dtrace_mode=${TWQ_DTRACE_MODE:-}
+dtrace_target=${TWQ_DTRACE_TARGET:-swift-repeat}
+dtrace_timeout=${TWQ_DTRACE_TIMEOUT:-120}
+dtrace_rounds=${TWQ_DTRACE_ROUNDS:-64}
+dtrace_tasks=${TWQ_DTRACE_TASKS:-8}
+dtrace_delay_ms=${TWQ_DTRACE_DELAY_MS:-20}
 
 vm_image=${TWQ_VM_IMAGE:-}
 guest_root=${TWQ_GUEST_ROOT:-}
@@ -152,6 +164,12 @@ env \
   TWQ_DISPATCH_PROBE_FILTER="$dispatch_filter" \
   TWQ_SWIFT_PROBE_PROFILE="$swift_profile" \
   TWQ_SWIFT_PROBE_FILTER="$swift_filter" \
+  TWQ_DTRACE_MODE="$dtrace_mode" \
+  TWQ_DTRACE_TARGET="$dtrace_target" \
+  TWQ_DTRACE_TIMEOUT="$dtrace_timeout" \
+  TWQ_DTRACE_ROUNDS="$dtrace_rounds" \
+  TWQ_DTRACE_TASKS="$dtrace_tasks" \
+  TWQ_DTRACE_DELAY_MS="$dtrace_delay_ms" \
   sh "${repo_root}/scripts/bhyve/stage-guest.sh"
 
 echo "==> Running guest benchmark lane"
@@ -191,6 +209,11 @@ case "$run_rc" in
     ;;
 esac
 
+if [ -n "$dtrace_mode" ]; then
+  echo "DTrace serial log: $serial_log"
+  exit 0
+fi
+
 echo "==> Extracting structured benchmark baseline"
 python3 "${repo_root}/scripts/benchmarks/extract-m13-baseline.py" \
   --serial-log "$serial_log" \
@@ -199,6 +222,9 @@ python3 "${repo_root}/scripts/benchmarks/extract-m13-baseline.py" \
   --dispatch-filter "$dispatch_filter" \
   --swift-profile "$swift_profile" \
   --swift-filter "$swift_filter"
+
+echo "==> Benchmark summary"
+python3 "${repo_root}/scripts/benchmarks/summarize-m13-baseline.py" "$benchmark_json"
 
 echo "Serial log: $serial_log"
 echo "Benchmark JSON: $benchmark_json"

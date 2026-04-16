@@ -15,6 +15,9 @@ SECTION_END_RE = re.compile(
     r"(?P<phase>before|after) end ===$"
 )
 SYSCTL_RE = re.compile(r"^(?P<key>kern\.twq\.[^:]+):\s*(?P<value>.+)$")
+LIBDISPATCH_COUNTER_RE = re.compile(
+    r"^\[libdispatch-twq-counters\]\s+(?P<body>.+)$"
+)
 
 
 def parse_args():
@@ -78,6 +81,16 @@ def subtract(after, before):
     ):
         return [a - b for a, b in zip(after, before)]
     return None
+
+
+def parse_key_value_fields(text: str):
+    values = {}
+    for field in text.split():
+        if "=" not in field:
+            continue
+        key, value = field.split("=", 1)
+        values[key] = parse_scalar(value)
+    return values
 
 
 def sorted_round_events(events, phase):
@@ -161,6 +174,7 @@ def main():
     progress_counts = {"dispatch": {}, "swift": {}}
     progress_events = {"dispatch": {}, "swift": {}}
     counter_sections = {"dispatch": {}, "swift": {}}
+    libdispatch_counters = {"dispatch": {}, "swift": {}}
     metadata = {
         "serial_log": str(serial_log.resolve()),
         "label": args.label,
@@ -170,9 +184,18 @@ def main():
     }
 
     current_section = None
+    last_probe_key = None
 
     for raw_line in serial_log.read_text(encoding="utf-8", errors="replace").splitlines():
         line = raw_line.rstrip("\n")
+
+        libdispatch_match = LIBDISPATCH_COUNTER_RE.match(line.strip())
+        if libdispatch_match and last_probe_key is not None:
+            domain, mode = last_probe_key
+            libdispatch_counters[domain].setdefault(mode, []).append(
+                parse_key_value_fields(libdispatch_match.group("body"))
+            )
+            continue
 
         match = SECTION_RE.match(line)
         if match:
@@ -227,6 +250,7 @@ def main():
             continue
 
         terminal_results[domain][mode] = payload
+        last_probe_key = (domain, mode)
 
     benchmarks = {}
     for domain in ("dispatch", "swift"):
@@ -251,6 +275,7 @@ def main():
                 "round_metrics": build_round_metrics(
                     progress_events[domain].get(mode, [])
                 ),
+                "libdispatch_counters": libdispatch_counters[domain].get(mode, []),
                 "twq_before": before,
                 "twq_after": after,
                 "twq_delta": delta,
@@ -268,7 +293,7 @@ def main():
     output.write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "metadata": metadata,
                 "summary": summary,
                 "benchmarks": benchmarks,
