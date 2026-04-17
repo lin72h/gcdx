@@ -2,6 +2,77 @@
 
 ## 2026-04-16
 
+### M14 compare tooling now produces repo-native decisions
+
+The repo-side M14 comparison is no longer just a pair of ad hoc commands.
+
+What changed:
+
+1. `scripts/benchmarks/extract-m14-benchmark.py` now normalizes current macOS
+   reports, current FreeBSD benchmark JSON, and raw FreeBSD serial logs into a
+   single benchmark-first schema;
+2. the same extractor now accepts richer FreeBSD inputs that already carry
+   `full_run`, `steady_state`, or `per_round.rows` data, instead of assuming
+   only the older M13 baseline shape;
+3. `scripts/benchmarks/compare-m14-benchmarks.py` now distinguishes strict
+   `1.50x` reporting from the intended “about `1.5x`” stop-tuning policy,
+   defaulting that softer decision band to `1.65x`;
+4. the compare CLI can now write one machine-readable JSON decision file with
+   the same classification and ratio details it prints to stdout;
+5. `scripts/benchmarks/run-m14-compare.sh` now runs the whole normalization +
+   comparison lane into one artifact directory with normalized FreeBSD/macOS
+   JSON plus a saved summary;
+6. `fixtures/benchmarks/m14-*.json` and
+   `scripts/benchmarks/verify-m14-tooling.py` now provide a fixture-backed
+   verification lane for the `stop`, `tune`, and `inconclusive` outcomes;
+7. `extract-m14-benchmark.py` and `run-m14-compare.sh` now treat FreeBSD
+   round-snapshot artifacts as a first-class source kind instead of assuming
+   only the older `benchmarks{}` JSON layout;
+8. `discover-m14-artifacts.py` and `summarize-m14-compare.py` now provide
+   input discovery plus a reviewable compare report, and the runner can use
+   `TWQ_M14_FREEBSD_SOURCE=auto` / `TWQ_M14_MACOS_REPORT=auto`;
+9. `compare-m14-benchmarks.py` now treats workload-match and metric-coverage
+   validation as part of the decision itself, instead of letting superficially
+   similar rates produce a confident result on a mismatched tuple;
+10. `validate-m14-artifacts.py` and `m14_validation.py` now validate both raw
+    and normalized M14 inputs, `discover-m14-artifacts.py` prefers
+    comparison-ready candidates, and `run-m14-compare.sh` saves validation
+    artifacts while rejecting malformed inputs before comparison;
+11. `discover-m14-artifacts.py` now emits a pair-aware `pairs.best` selection,
+    and `run-m14-compare.sh` uses that matched pair when both sides are
+    `auto`, instead of picking the two sides independently;
+12. `audit-m14-artifact-schema.py` and `m14_audit.py` now audit raw M14
+    artifacts for unmapped workload, classification, full-run, steady-state,
+    and per-round fields; validation surfaces that audit as warnings, discovery
+    prefers lower-drift candidates, and the runner saves input audit artifacts.
+
+What this fixes:
+
+1. the earlier compare CLI would have judged the current
+   `3.21 / round` FreeBSD vs `2.04 / round` macOS seam as merely
+   `inconclusive`, even though the project’s own M14 note and native macOS
+   report already treat that pair as within the intended “about `1.5x`”
+   stop boundary;
+2. the repo now has one repeatable lane for consuming an incoming FreeBSD M14
+   artifact instead of relying on hand-entered command sequences;
+3. the repo can now regression-check M14 tooling without depending on the
+   presence of one specific local macOS or FreeBSD artifact tree;
+4. the repo is now materially closer to accepting the expected
+   `m14-round-snapshots-*.json` family directly, including shell-runner
+   auto-detection for that filename pattern;
+5. the repo can now discover likely M14 inputs and emit both a terse machine
+   decision and a human-readable report artifact for review;
+6. the repo will now keep a mismatched workload pair `inconclusive`, even if
+   the per-round seam rates happen to sit inside the intended stop band;
+7. the repo will now refuse malformed raw artifacts early, instead of
+   normalizing and comparing them far enough to make debugging ambiguous;
+8. the auto lane can now avoid a false “best artifact” pick when a newer local
+   FreeBSD candidate is valid in isolation but mismatched against the macOS
+   comparison tuple;
+9. the first real FreeBSD M14 artifact can now arrive with new fields without
+   forcing blind trust or immediate extractor surgery, because the lane will
+   preserve a usable compare result while telling us exactly what it dropped.
+
 ### M14 macOS comparison lane landed
 
 The repo now has a native macOS comparison lane for the M13 -> M14 decision,

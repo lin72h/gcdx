@@ -1,0 +1,102 @@
+{
+  "benchmarks": {
+    "dispatch.main-executor-resume-repeat": {
+      "classification": {
+        "default_overcommit_continuation_dominant": false,
+        "default_overcommit_receives_mainq_traffic": false,
+        "default_receives_source_traffic": true,
+        "mystery_control_flag": true
+      },
+      "full_run": {
+        "mystery_control_full_run_metric": 2
+      },
+      "probe": {
+        "completed_rounds": 64,
+        "delay_ms": 20,
+        "expected_total_sum": 1792,
+        "rounds": 64,
+        "tasks": 8,
+        "total_sum": 1792,
+        "unknown_workload_tag": 1
+      },
+      "status": "ok",
+      "steady_state": {
+        "end_round": 63,
+        "included_rounds": 56,
+        "metrics_per_round": {
+          "dispatch_root_poke_slow_default_overcommit": {
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0
+          },
+          "dispatch_root_push_mainq_default_overcommit": {
+            "max": 0.0,
+            "mean": 0.0,
+            "min": 0.0
+          },
+          "mystery_control_steady_metric": {
+            "max": 1.0,
+            "mean": 1.0,
+            "min": 1.0
+          }
+        },
+        "start_round": 8
+      }
+    },
+    "swift.dispatchmain-taskhandles-after-repeat": {
+      "classification": {
+        "default_overcommit_continuation_dominant": false,
+        "default_overcommit_receives_mainq_traffic": true,
+        "default_receives_source_traffic": true,
+        "mystery_primary_flag": true
+      },
+      "full_run": {
+        "mystery_primary_full_run_metric": 7
+      },
+      "probe": {
+        "completed_rounds": 64,
+        "delay_ms": 20,
+        "expected_total_sum": 1792,
+        "rounds": 64,
+        "tasks": 8,
+        "total_sum": 1792,
+        "unknown_workload_tag": 1
+      },
+      "status": "ok",
+      "steady_state": {
+        "end_round": 63,
+        "included_rounds": 56,
+        "metrics_per_round": {
+          "dispatch_root_poke_slow_default_overcommit": {
+            "max": 6.0,
+            "mean": 3.2,
+            "min": 1.0
+          },
+          "dispatch_root_push_mainq_default_overcommit": {
+            "max": 6.0,
+            "mean": 3.2,
+            "min": 1.0
+          },
+          "dispatch_root_push_source_default": {
+            "max": 8.0,
+            "mean": 8.0,
+            "min": 8.0
+          },
+          "mystery_primary_steady_metric": {
+            "max": 3.0,
+            "mean": 2.0,
+            "min": 1.0
+          },
+          "worker_requested_threads": {
+            "max": 28.0,
+            "mean": 17.6,
+            "min": 10.0
+          }
+        },
+        "start_round": 8
+      }
+    }
+  },
+  "label": "fixture-m14-freebsd-reference-drift",
+  "schema_version": 1
+}

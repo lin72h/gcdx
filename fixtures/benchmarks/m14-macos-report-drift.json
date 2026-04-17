@@ -1,0 +1,196 @@
+{
+  "benchmarks": {
+    "dispatch.main-executor-resume-repeat": {
+      "classification": {
+        "default_overcommit_continuation_dominant": false,
+        "default_overcommit_receives_mainq_traffic": false,
+        "default_receives_source_traffic": true,
+        "mystery_control_flag": true
+      },
+      "dispatch_introspection_available": true,
+      "full_run": {
+        "completed_rounds": 64,
+        "mystery_control_full_run_metric": 2,
+        "pthread_workqueue_addthreads_calls": 6,
+        "pthread_workqueue_addthreads_requested_threads": 6,
+        "root_poke_slow_default": 6,
+        "root_poke_slow_default_overcommit": 0,
+        "root_push_continuation_default": 16,
+        "root_push_continuation_default_overcommit": 0,
+        "root_push_empty_default": 2,
+        "root_push_empty_default_overcommit": 0,
+        "root_push_mainq_default_overcommit": 0,
+        "root_push_source_default": 16,
+        "root_push_total_default": 32,
+        "root_push_total_default_overcommit": 0,
+        "root_requested_threads_default": 6,
+        "root_requested_threads_default_overcommit": 0,
+        "round": 63
+      },
+      "mode": "main-executor-resume-repeat",
+      "per_round": {
+        "rows": [
+          {
+            "completed_rounds": 9,
+            "elapsed_ns": 25000000,
+            "mystery_control_round_metric": 1,
+            "pthread_workqueue_addthreads_calls": 1,
+            "pthread_workqueue_addthreads_requested_threads": 5,
+            "root_poke_slow_default": 3,
+            "root_poke_slow_default_overcommit": 0,
+            "root_push_continuation_default": 8,
+            "root_push_continuation_default_overcommit": 0,
+            "root_push_empty_default": 1,
+            "root_push_empty_default_overcommit": 0,
+            "root_push_mainq_default_overcommit": 0,
+            "root_push_source_default": 8,
+            "root_push_total_default": 16,
+            "root_push_total_default_overcommit": 0,
+            "root_requested_threads_default": 3,
+            "root_requested_threads_default_overcommit": 0,
+            "round": 8
+          },
+          {
+            "completed_rounds": 10,
+            "elapsed_ns": 24000000,
+            "mystery_control_round_metric": 1,
+            "pthread_workqueue_addthreads_calls": 1,
+            "pthread_workqueue_addthreads_requested_threads": 6,
+            "root_poke_slow_default": 3,
+            "root_poke_slow_default_overcommit": 0,
+            "root_push_continuation_default": 8,
+            "root_push_continuation_default_overcommit": 0,
+            "root_push_empty_default": 1,
+            "root_push_empty_default_overcommit": 0,
+            "root_push_mainq_default_overcommit": 0,
+            "root_push_source_default": 8,
+            "root_push_total_default": 16,
+            "root_push_total_default_overcommit": 0,
+            "root_requested_threads_default": 3,
+            "root_requested_threads_default_overcommit": 0,
+            "round": 9
+          }
+        ]
+      },
+      "raw_log": "fixtures/benchmarks/m14-macos-report-drift.json",
+      "terminal": {
+        "data": {
+          "completed_rounds": 64,
+          "delay_ms": 20,
+          "expected_total_sum": 1792,
+          "mode": "main-executor-resume-repeat",
+          "rounds": 64,
+          "tasks": 8,
+          "total_sum": 1792,
+          "unknown_workload_tag": 1
+        },
+        "status": "ok"
+      }
+    },
+    "swift.dispatchmain-taskhandles-after-repeat": {
+      "classification": {
+        "default_overcommit_continuation_dominant": false,
+        "default_overcommit_receives_mainq_traffic": true,
+        "default_receives_source_traffic": true,
+        "mystery_primary_flag": true
+      },
+      "dispatch_introspection_available": true,
+      "full_run": {
+        "completed_rounds": 64,
+        "mystery_primary_full_run_metric": 4,
+        "pthread_workqueue_addthreads_calls": 4,
+        "pthread_workqueue_addthreads_requested_threads": 22,
+        "root_poke_slow_default": 6,
+        "root_poke_slow_default_overcommit": 4,
+        "root_push_continuation_default": 16,
+        "root_push_continuation_default_overcommit": 0,
+        "root_push_empty_default": 2,
+        "root_push_empty_default_overcommit": 4,
+        "root_push_mainq_default_overcommit": 4,
+        "root_push_source_default": 16,
+        "root_push_total_default": 32,
+        "root_push_total_default_overcommit": 4,
+        "root_requested_threads_default": 6,
+        "root_requested_threads_default_overcommit": 4,
+        "round": 63
+      },
+      "mode": "dispatchmain-taskhandles-after-repeat",
+      "per_round": {
+        "rows": [
+          {
+            "completed_rounds": 9,
+            "elapsed_ns": 23800000,
+            "mystery_primary_round_metric": 2,
+            "pthread_workqueue_addthreads_calls": 2,
+            "pthread_workqueue_addthreads_requested_threads": 10,
+            "root_poke_slow_default": 3,
+            "root_poke_slow_default_overcommit": 2,
+            "root_push_continuation_default": 8,
+            "root_push_continuation_default_overcommit": 0,
+            "root_push_empty_default": 1,
+            "root_push_empty_default_overcommit": 2,
+            "root_push_mainq_default_overcommit": 2,
+            "root_push_source_default": 8,
+            "root_push_total_default": 16,
+            "root_push_total_default_overcommit": 2,
+            "root_requested_threads_default": 3,
+            "root_requested_threads_default_overcommit": 2,
+            "round": 8
+          },
+          {
+            "completed_rounds": 10,
+            "elapsed_ns": 24200000,
+            "mystery_primary_round_metric": 2,
+            "pthread_workqueue_addthreads_calls": 2,
+            "pthread_workqueue_addthreads_requested_threads": 12,
+            "root_poke_slow_default": 3,
+            "root_poke_slow_default_overcommit": 2,
+            "root_push_continuation_default": 8,
+            "root_push_continuation_default_overcommit": 0,
+            "root_push_empty_default": 1,
+            "root_push_empty_default_overcommit": 2,
+            "root_push_mainq_default_overcommit": 2,
+            "root_push_source_default": 8,
+            "root_push_total_default": 16,
+            "root_push_total_default_overcommit": 2,
+            "root_requested_threads_default": 3,
+            "root_requested_threads_default_overcommit": 2,
+            "round": 9
+          }
+        ]
+      },
+      "raw_log": "fixtures/benchmarks/m14-macos-report-drift.json",
+      "terminal": {
+        "data": {
+          "completed_rounds": 64,
+          "delay_ms": 20,
+          "expected_total_sum": 1792,
+          "mode": "dispatchmain-taskhandles-after-repeat",
+          "rounds": 64,
+          "tasks": 8,
+          "total_sum": 1792,
+          "unknown_workload_tag": 1
+        },
+        "status": "ok"
+      }
+    }
+  },
+  "decision": {
+    "control_supports_specificity": true,
+    "outcome": "stop_tuning_this_seam",
+    "rationale": "fixture-drift",
+    "same_qualitative_split": true,
+    "window": "rounds 8-9"
+  },
+  "label": "fixture-m14-macos-report-drift",
+  "measurement_setup": {
+    "method": "fixture-drift",
+    "primary_workload": "swift.dispatchmain-taskhandles-after-repeat",
+    "secondary_workload": "dispatch.main-executor-resume-repeat",
+    "steady_state_start_round": 8
+  },
+  "schema_version": 1,
+  "symbol_probe_reality": {
+    "fixture": true
+  }
+}

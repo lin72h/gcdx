@@ -1,0 +1,50 @@
+{
+  "label": "fixture-m14-round-snapshots-invalid",
+  "lanes": [
+    {
+      "classification": {
+        "default_overcommit_continuation_dominant": false,
+        "default_overcommit_receives_mainq_traffic": false,
+        "default_receives_source_traffic": true
+      },
+      "mode": "main-executor-resume-repeat",
+      "round_snapshots": [
+        {
+          "completed_rounds": 9,
+          "dispatch_root_poke_slow_default_overcommit": 0,
+          "dispatch_root_push_mainq_default_overcommit": 0,
+          "round": 8
+        }
+      ],
+      "status": "ok",
+      "workload": {
+        "completed_rounds": 64,
+        "delay_ms": 20,
+        "expected_total_sum": 1792,
+        "rounds": 64,
+        "tasks": 8,
+        "total_sum": 1792
+      }
+    },
+    {
+      "mode": "dispatchmain-taskhandles-after-repeat",
+      "round_snapshots": [
+        {
+          "completed_rounds": 9,
+          "dispatch_root_push_source_default": 8,
+          "round": 8
+        }
+      ],
+      "status": "ok",
+      "workload": {
+        "completed_rounds": 64,
+        "delay_ms": 20,
+        "expected_total_sum": 1792,
+        "rounds": 64,
+        "tasks": 8,
+        "total_sum": 1792
+      }
+    }
+  ],
+  "schema_version": 1
+}

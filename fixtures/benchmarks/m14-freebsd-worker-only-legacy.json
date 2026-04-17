@@ -1,0 +1,38 @@
+{
+  "benchmarks": {
+    "dispatch.main-executor-resume-repeat": {
+      "probe": {
+        "completed_rounds": 64,
+        "delay_ms": 20,
+        "expected_total_sum": 1792,
+        "rounds": 64,
+        "tasks": 8,
+        "total_sum": 1792
+      },
+      "status": "ok",
+      "twq_delta": {
+        "reqthreads_count": 320,
+        "thread_enter_count": 150,
+        "thread_return_count": 147
+      }
+    },
+    "swift.dispatchmain-taskhandles-after-repeat": {
+      "probe": {
+        "completed_rounds": 64,
+        "delay_ms": 20,
+        "expected_total_sum": 1792,
+        "rounds": 64,
+        "tasks": 8,
+        "total_sum": 1792
+      },
+      "status": "ok",
+      "twq_delta": {
+        "reqthreads_count": 1863,
+        "thread_enter_count": 884,
+        "thread_return_count": 881
+      }
+    }
+  },
+  "label": "fixture-m14-freebsd-worker-only-legacy",
+  "schema_version": 1
+}

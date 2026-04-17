@@ -1,0 +1,43 @@
+{
+  "benchmarks": {
+    "swift.dispatchmain-taskhandles-after-repeat": {
+      "dispatch_introspection_available": true,
+      "mode": "dispatchmain-taskhandles-after-repeat",
+      "per_round": {
+        "rows": [
+          {
+            "completed_rounds": 9,
+            "root_push_source_default": 8,
+            "round": 8
+          }
+        ]
+      },
+      "raw_log": "fixtures/benchmarks/invalid-m14-report.json",
+      "terminal": {
+        "data": {
+          "completed_rounds": 64,
+          "delay_ms": 20,
+          "expected_total_sum": 1792,
+          "mode": "dispatchmain-taskhandles-after-repeat",
+          "rounds": 64,
+          "tasks": 8,
+          "total_sum": 1792
+        },
+        "status": "ok"
+      }
+    }
+  },
+  "decision": {
+    "outcome": "fixture-invalid"
+  },
+  "label": "fixture-invalid-m14-report",
+  "measurement_setup": {
+    "method": "fixture-invalid",
+    "primary_workload": "swift.dispatchmain-taskhandles-after-repeat",
+    "steady_state_start_round": 8
+  },
+  "schema_version": 1,
+  "symbol_probe_reality": {
+    "fixture": true
+  }
+}
