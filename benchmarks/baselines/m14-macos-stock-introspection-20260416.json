@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "platform": "macos",
+  "lane": "m14-swift-dispatchmain-repeat-stock-introspection",
+  "metadata": {
+    "os_version": "macOS 26.4.1 (25E253), Darwin 25.4.0",
+    "hardware": "arm64 Apple Silicon host",
+    "notes": "Stock macOS binaries plus /usr/lib/system/introspection libdispatch. SIP blocked DTrace on stock binaries, so the result uses dispatch introspection hooks plus a runtime worker_request hook. Source result was reconstructed into this repo-owned schema from MX-side output.",
+    "source_artifacts": [
+      "/Users/linz/Local/wip-gcdx/artifacts/macos/m14-introspection-final/m14-report.json",
+      "/Users/linz/Local/wip-gcdx/artifacts/macos/m14-introspection-final/swift-repeat.log",
+      "/Users/linz/Local/wip-gcdx/artifacts/macos/m14-introspection-final/c-repeat.log",
+      "/Users/linz/Local/wip-gcdx/artifacts/macos/m14-introspection-final/stock-symbols.json",
+      "/Users/linz/Local/wip-gcdx/artifacts/macos/m14-introspection-final/m14-run.json"
+    ]
+  },
+  "workload": {
+    "domain": "swift",
+    "mode": "dispatchmain-taskhandles-after-repeat",
+    "rounds": 64,
+    "tasks": 8,
+    "delay_ms": 20,
+    "steady_start_round": 8,
+    "steady_end_round": 63
+  },
+  "classification": {
+    "default_receives_source_traffic": true,
+    "default_overcommit_receives_mainq_traffic": true,
+    "default_overcommit_continuation_dominant": false
+  },
+  "metrics": {
+    "full_run": {
+      "root_push_mainq_default_overcommit": 131,
+      "root_poke_slow_default_overcommit": 131,
+      "pthread_workqueue_addthreads_calls": 719,
+      "pthread_workqueue_addthreads_requested_threads": 719,
+      "root_push_empty_default": 64,
+      "root_poke_slow_default": 187,
+      "root_push_source_default": 512
+    },
+    "steady_state_per_round": {
+      "root_push_mainq_default_overcommit": 2.04,
+      "root_poke_slow_default_overcommit": 2.04,
+      "pthread_workqueue_addthreads_calls": 11.21,
+      "pthread_workqueue_addthreads_requested_threads": 11.21,
+      "root_push_empty_default": 1.0,
+      "root_poke_slow_default": 2.91,
+      "root_push_source_default": 8.0
+    },
+    "per_round": {
+      "root_push_mainq_default_overcommit": [],
+      "root_poke_slow_default_overcommit": [],
+      "pthread_workqueue_addthreads_calls": [],
+      "pthread_workqueue_addthreads_requested_threads": [],
+      "root_push_empty_default": [],
+      "root_poke_slow_default": [],
+      "root_push_source_default": []
+    }
+  },
+  "controls": {
+    "c_main_executor_resume_repeat": {
+      "workload": {
+        "domain": "dispatch",
+        "mode": "main-executor-resume-repeat",
+        "rounds": 64,
+        "tasks": 8,
+        "delay_ms": 20,
+        "steady_start_round": 8,
+        "steady_end_round": 63
+      },
+      "steady_state_per_round": {
+        "root_push_mainq_default_overcommit": 0.0,
+        "root_poke_slow_default_overcommit": 0.0,
+        "pthread_workqueue_addthreads_requested_threads": 4.3
+      }
+    }
+  },
+  "decision": {
+    "verdict": "stop_tuning_this_seam",
+    "reason": "Same qualitative Swift/main-queue handoff seam appears on macOS, the C control stays clean, and FreeBSD is only about 1.58x hotter on the primary rates, not around 2x."
+  }
+}

@@ -46,11 +46,15 @@ defmodule TwqTest.VMIntegrationTest do
 
     dispatch_basic_line = dispatch_line_for_mode(dispatch_probe_lines, "\"mode\":\"basic\"")
     dispatch_pressure_line = dispatch_line_for_mode(dispatch_probe_lines, "\"mode\":\"pressure\"")
+
     workqueue_timeout_line =
       dispatch_line_for_mode(workqueue_probe_lines, "\"mode\":\"idle-timeout\"")
 
     swift_async_smoke_line = dispatch_line_for_mode(swift_probe_lines, "\"mode\":\"async-smoke\"")
-    swift_dispatch_line = dispatch_line_for_mode(swift_probe_lines, "\"mode\":\"dispatch-control\"")
+
+    swift_dispatch_line =
+      dispatch_line_for_mode(swift_probe_lines, "\"mode\":\"dispatch-control\"")
+
     swift_mainqueue_resume_line =
       dispatch_line_for_mode(swift_probe_lines, "\"mode\":\"mainqueue-resume\"")
 
@@ -89,20 +93,28 @@ defmodule TwqTest.VMIntegrationTest do
     assert String.contains?(result.data[:serial_log], "FreeBSD 15.0-STABLE TWQDEBUG amd64")
     assert String.contains?(result.data[:serial_log], "=== twq swift profile ===")
 
-    assert Enum.any?(probe_lines, &line_has?(&1, "\"mode\":\"init\"", "\"rc\":19", "\"errno_name\":\"OK\""))
+    assert Enum.any?(
+             probe_lines,
+             &line_has?(&1, "\"mode\":\"init\"", "\"rc\":19", "\"errno_name\":\"OK\"")
+           )
+
     assert Enum.any?(
              probe_lines,
              &line_has?(&1, "\"mode\":\"raw\"", "\"op\":9999", "\"errno_name\":\"EINVAL\"")
            )
+
     assert String.contains?(workqueue_timeout_line, "\"status\":\"ok\"")
+
     assert line_int_value(workqueue_timeout_line, "settled_total") ==
              line_int_value(workqueue_timeout_line, "warm_floor")
 
     assert String.contains?(dispatch_basic_line, "\"status\":\"ok\"")
     assert String.contains?(dispatch_basic_line, "\"completed\":8")
     assert String.contains?(dispatch_pressure_line, "\"status\":\"ok\"")
+
     assert line_int_value(dispatch_basic_line, "max_inflight") >
              line_int_value(dispatch_pressure_line, "default_max_inflight")
+
     assert String.contains?(swift_async_smoke_line, "\"status\":\"ok\"")
     assert String.contains?(swift_dispatch_line, "\"status\":\"ok\"")
     assert line_int_value(swift_dispatch_line, "completed") == 8
@@ -137,7 +149,9 @@ defmodule TwqTest.VMIntegrationTest do
     serial_log = Path.join(temp_root, "#{vm_name}.integration.serial.log")
     guest_root = Path.join(temp_root, "#{vm_name}.integration.root")
     custom_dispatch = Path.expand("../artifacts/libdispatch-stage/libdispatch.so", repo_root)
-    stock_dispatch = Path.expand("../artifacts/swift-stock-dispatch-stage/libdispatch.so", repo_root)
+
+    stock_dispatch =
+      Path.expand("../artifacts/swift-stock-dispatch-stage/libdispatch.so", repo_root)
 
     custom_symbols = dispatch_dynamic_symbols(custom_dispatch)
     stock_symbols = dispatch_dynamic_symbols(stock_dispatch)

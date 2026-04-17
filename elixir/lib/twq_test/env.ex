@@ -13,6 +13,7 @@ defmodule TwqTest.Env do
     :zig_global_cache_dir,
     :probe_bin,
     :workqueue_probe_bin,
+    :workqueue_wake_bench_bin,
     :swift_async_smoke_bin,
     :swift_taskgroup_probe_bin,
     :swift_dispatch_probe_bin,
@@ -47,6 +48,7 @@ defmodule TwqTest.Env do
           zig_global_cache_dir: String.t(),
           probe_bin: String.t(),
           workqueue_probe_bin: String.t(),
+          workqueue_wake_bench_bin: String.t(),
           swift_async_smoke_bin: String.t(),
           swift_taskgroup_probe_bin: String.t(),
           swift_dispatch_probe_bin: String.t(),
@@ -121,6 +123,14 @@ defmodule TwqTest.Env do
         :workqueue_probe_bin,
         "TWQ_WORKQUEUE_PROBE_BIN",
         Path.join(zig_prefix, "bin/twq-workqueue-probe")
+      )
+
+    workqueue_wake_bench_bin =
+      path_value(
+        overrides,
+        :workqueue_wake_bench_bin,
+        "TWQ_WORKQUEUE_WAKE_BENCH_BIN",
+        Path.join(zig_prefix, "bin/twq-bench-workqueue-wake")
       )
 
     swift_async_smoke_bin =
@@ -262,6 +272,7 @@ defmodule TwqTest.Env do
       zig_global_cache_dir: zig_global_cache_dir,
       probe_bin: probe_bin,
       workqueue_probe_bin: workqueue_probe_bin,
+      workqueue_wake_bench_bin: workqueue_wake_bench_bin,
       swift_async_smoke_bin: swift_async_smoke_bin,
       swift_taskgroup_probe_bin: swift_taskgroup_probe_bin,
       swift_dispatch_probe_bin: swift_dispatch_probe_bin,
@@ -298,6 +309,7 @@ defmodule TwqTest.Env do
       "TWQ_ARTIFACTS_ROOT" => env.artifacts_root,
       "TWQ_PROBE_BIN" => env.probe_bin,
       "TWQ_WORKQUEUE_PROBE_BIN" => env.workqueue_probe_bin,
+      "TWQ_WORKQUEUE_WAKE_BENCH_BIN" => env.workqueue_wake_bench_bin,
       "TWQ_SWIFT_ASYNC_SMOKE_BIN" => env.swift_async_smoke_bin,
       "TWQ_SWIFT_TASKGROUP_PROBE_BIN" => env.swift_taskgroup_probe_bin,
       "TWQ_SWIFT_DISPATCH_PROBE_BIN" => env.swift_dispatch_probe_bin,

@@ -1,0 +1,78 @@
+{
+  "generated_on": "2026-04-16",
+  "kernel": {
+    "bootfile": "/boot/TWQDEBUG/kernel",
+    "ident": "TWQDEBUG",
+    "osrelease": "15.0-STABLE"
+  },
+  "modes": {
+    "reqthreads": {
+      "artifact_json": "/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/zig-hotpath-reqthreads-20260416T192000Z.json",
+      "counter_delta": {
+        "init_count": 0,
+        "reqthreads_count": 256,
+        "thread_enter_count": 0,
+        "thread_return_count": 0
+      },
+      "last_error": 0,
+      "max_ns": 4477,
+      "mean_ns": 1151,
+      "median_ns": 1130,
+      "min_ns": 1106,
+      "p95_ns": 1196,
+      "p99_ns": 1219,
+      "request_count": 1,
+      "sample_errors": 0,
+      "samples": 256,
+      "settle_ms": 50,
+      "stddev_ns": 210,
+      "warmup": 32
+    },
+    "reqthreads_overcommit": {
+      "artifact_json": "/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/zig-hotpath-reqthreads-overcommit-20260416T192500Z.json",
+      "counter_delta": {
+        "init_count": 0,
+        "reqthreads_count": 256,
+        "thread_enter_count": 0,
+        "thread_return_count": 0
+      },
+      "last_error": 0,
+      "max_ns": 16119,
+      "mean_ns": 524,
+      "median_ns": 402,
+      "min_ns": 385,
+      "p95_ns": 1099,
+      "p99_ns": 1113,
+      "request_count": 1,
+      "sample_errors": 0,
+      "samples": 256,
+      "settle_ms": 50,
+      "stddev_ns": 1015,
+      "warmup": 32
+    },
+    "should_narrow": {
+      "artifact_json": "/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/zig-hotpath-should-narrow-20260416T191500Z.json",
+      "bool_false_count": 1024,
+      "bool_true_count": 0,
+      "counter_delta": {
+        "init_count": 0,
+        "reqthreads_count": 0,
+        "thread_enter_count": 0,
+        "thread_return_count": 0
+      },
+      "last_error": 0,
+      "max_ns": 10361,
+      "mean_ns": 1035,
+      "median_ns": 1012,
+      "min_ns": 986,
+      "p95_ns": 1032,
+      "p99_ns": 1079,
+      "sample_errors": 0,
+      "samples": 1024,
+      "settle_ms": 50,
+      "stddev_ns": 415,
+      "warmup": 128
+    }
+  },
+  "schema_version": 1
+}

@@ -12,6 +12,11 @@ defmodule TwqTest.JSON do
     |> IO.iodata_to_binary()
   end
 
+  @spec decode!(String.t()) :: term()
+  def decode!(binary) when is_binary(binary) do
+    :json.decode(binary)
+  end
+
   defp encode(nil), do: "null"
   defp encode(true), do: "true"
   defp encode(false), do: "false"

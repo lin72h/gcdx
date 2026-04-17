@@ -5,6 +5,7 @@
 #include <sys/param.h>
 #include <sys/sysctl.h>
 #include <errno.h>
+#include <execinfo.h>
 #include <inttypes.h>
 #include <pthread.h>
 #include <stdbool.h>
@@ -12,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -22,6 +24,9 @@
 #define	DISPATCH_QUEUE_WIDTH_MAX_LOGICAL_CPUS	(-3)
 
 extern void dispatch_queue_set_width(dispatch_queue_t dq, long width);
+extern void _dispatch_twq_counter_emit_snapshot(const char *domain,
+    const char *mode, const char *phase, uint64_t round,
+    uint64_t completed_rounds);
 
 enum dispatch_probe_mode {
 	DISPATCH_PROBE_MODE_BASIC,
@@ -146,6 +151,15 @@ struct dispatch_twq_round_counters {
 	uint32_t	bucket_active;
 };
 
+static inline void
+emit_libdispatch_round_snapshot(const char *domain, const char *mode,
+    const char *phase, uint32_t round, uint32_t completed_rounds)
+{
+
+	_dispatch_twq_counter_emit_snapshot(domain, mode, phase, round,
+	    completed_rounds);
+}
+
 struct dispatch_repeat_child {
 	struct dispatch_repeat_probe	*probe;
 	uint32_t			 task;
@@ -199,6 +213,39 @@ struct dispatch_resume_repeat_probe {
 	int					 round_start_sysctl_error;
 	int					 features;
 };
+
+static void
+dispatch_probe_crash_handler(int signo, siginfo_t *info, void *uap __unused)
+{
+	void *frames[64];
+	int frame_count;
+
+	dprintf(2,
+	    "[dispatch-probe-crash] signal=%d addr=%p code=%d pid=%d tid=%ju\n",
+	    signo, info ? info->si_addr : NULL, info ? info->si_code : 0,
+	    getpid(), (uintmax_t)(uintptr_t)pthread_self());
+	frame_count = backtrace(frames, (int)(sizeof(frames) / sizeof(frames[0])));
+	if (frame_count > 0) {
+		backtrace_symbols_fd(frames, frame_count, STDERR_FILENO);
+	}
+	_exit(128 + signo);
+}
+
+static void
+install_dispatch_probe_crash_handlers(void)
+{
+	struct sigaction sa;
+
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_sigaction = dispatch_probe_crash_handler;
+	sa.sa_flags = SA_SIGINFO | SA_RESETHAND;
+	sigemptyset(&sa.sa_mask);
+
+	(void)sigaction(SIGSEGV, &sa, NULL);
+	(void)sigaction(SIGBUS, &sa, NULL);
+	(void)sigaction(SIGABRT, &sa, NULL);
+	(void)sigaction(SIGILL, &sa, NULL);
+}
 
 static uint32_t
 dispatch_warm_floor(void)
@@ -1253,6 +1300,9 @@ start_repeat_round(struct dispatch_repeat_probe *probe)
 		    probe->mode, probe->current_round, probe->completed_rounds,
 		    probe->round_start_sysctl_error);
 	}
+	emit_libdispatch_round_snapshot("dispatch", probe->mode,
+	    "round-start-counters", probe->current_round,
+	    probe->completed_rounds);
 	fflush(stdout);
 
 	probe->current_task = 0;
@@ -1379,6 +1429,9 @@ repeat_parent_worker(void *ctx)
 			    probe->round_start_sysctl_error != 0 ?
 			    probe->round_start_sysctl_error : round_end_sysctl_error);
 		}
+		emit_libdispatch_round_snapshot("dispatch", probe->mode,
+		    "round-ok-counters", probe->current_round,
+		    probe->completed_rounds);
 		fflush(stdout);
 
 		probe->current_round++;
@@ -1549,6 +1602,9 @@ resume_repeat_start_round(struct dispatch_resume_repeat_probe *probe)
 		    probe->mode, probe->current_round, probe->completed_rounds,
 		    probe->round_start_sysctl_error);
 	}
+	emit_libdispatch_round_snapshot("dispatch", probe->mode,
+	    "round-start-counters", probe->current_round,
+	    probe->completed_rounds);
 	fflush(stdout);
 
 	group = dispatch_group_create();
@@ -1626,6 +1682,9 @@ resume_repeat_round_complete_worker(void *ctx)
 		    probe->round_start_sysctl_error != 0 ?
 		    probe->round_start_sysctl_error : round_end_sysctl_error);
 	}
+	emit_libdispatch_round_snapshot("dispatch", probe->mode,
+	    "round-ok-counters", probe->current_round,
+	    probe->completed_rounds);
 	fflush(stdout);
 
 	dispatch_release(probe->round_group);
@@ -2385,6 +2444,7 @@ main(int argc, char **argv)
 	}
 
 	memset(&state, 0, sizeof(state));
+	install_dispatch_probe_crash_handlers();
 	pthread_mutex_init(&state.lock, NULL);
 	state.main_thread = (uintptr_t)pthread_self();
 	state.sleep_ms = sleep_ms;

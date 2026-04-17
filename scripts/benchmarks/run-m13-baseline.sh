@@ -152,8 +152,10 @@ cc \
   -L"$pthread_stage_dir" \
   -Wl,-rpath,"$dispatch_stage_dir" \
   -Wl,-rpath,"$pthread_stage_dir" \
+  -rdynamic \
   -ldispatch \
   -lthr \
+  -lexecinfo \
   -lc \
   -o "$dispatch_probe_bin"
 

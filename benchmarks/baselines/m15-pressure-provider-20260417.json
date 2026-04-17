@@ -1,0 +1,632 @@
+{
+  "contract": {
+    "current_signal_field": "nonidle_workers_current",
+    "current_signal_kind": "total_minus_idle",
+    "diagnostic_fields": [
+      "active_workers_current"
+    ],
+    "name": "twq_pressure_provider",
+    "per_bucket_scope": "diagnostic_only",
+    "quiescence_kind": "total_and_nonidle_zero",
+    "version": 1
+  },
+  "metadata": {
+    "generation_kind": "synthetic_sequence",
+    "monotonic_time_kind": "unavailable_in_derived_view",
+    "snapshot_count": 9
+  },
+  "provider_scope": "pressure_only",
+  "schema_version": 1,
+  "snapshots": {
+    "dispatch.basic": {
+      "aggregate": {
+        "active_workers_current": null,
+        "admitted_workers_total": null,
+        "block_backlog_total": null,
+        "blocked_events_total": null,
+        "blocked_workers_total": null,
+        "idle_workers_current": null,
+        "nonidle_workers_current": null,
+        "request_backlog_total": null,
+        "request_events_total": 9,
+        "requested_workers_total": null,
+        "should_narrow_true_total": null,
+        "total_workers_current": null,
+        "unblocked_events_total": null,
+        "unblocked_workers_total": null,
+        "worker_entries_total": 4,
+        "worker_returns_total": null
+      },
+      "diagnostics": {
+        "per_bucket": {}
+      },
+      "flags": {
+        "has_admission_feedback": false,
+        "has_block_feedback": false,
+        "has_live_current_counts": false,
+        "has_narrow_feedback": false,
+        "has_per_bucket_diagnostics": false,
+        "pressure_visible": false
+      },
+      "generation": 1,
+      "monotonic_time_ns": null,
+      "status": "ok",
+      "timestamp_kind": "derived_from_artifact",
+      "workload": {
+        "delay_ms": null,
+        "domain": "dispatch",
+        "mode": "basic",
+        "rounds": null,
+        "tasks": null
+      }
+    },
+    "dispatch.burst-reuse": {
+      "aggregate": {
+        "active_workers_current": 0,
+        "admitted_workers_total": 4,
+        "block_backlog_total": null,
+        "blocked_events_total": null,
+        "blocked_workers_total": null,
+        "idle_workers_current": 0,
+        "nonidle_workers_current": 0,
+        "request_backlog_total": 125,
+        "request_events_total": 45,
+        "requested_workers_total": 129,
+        "should_narrow_true_total": 0,
+        "total_workers_current": 0,
+        "unblocked_events_total": null,
+        "unblocked_workers_total": null,
+        "worker_entries_total": 16,
+        "worker_returns_total": 16
+      },
+      "diagnostics": {
+        "per_bucket": {
+          "active_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "admitted_workers": [
+            0,
+            0,
+            0,
+            4,
+            0,
+            0
+          ],
+          "idle_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "nonidle_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested_workers": [
+            0,
+            0,
+            0,
+            129,
+            0,
+            0
+          ],
+          "total_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "flags": {
+        "has_admission_feedback": true,
+        "has_block_feedback": false,
+        "has_live_current_counts": true,
+        "has_narrow_feedback": true,
+        "has_per_bucket_diagnostics": true,
+        "pressure_visible": true
+      },
+      "generation": 3,
+      "monotonic_time_ns": null,
+      "status": "ok",
+      "timestamp_kind": "derived_from_artifact",
+      "workload": {
+        "delay_ms": null,
+        "domain": "dispatch",
+        "mode": "burst-reuse",
+        "rounds": 4,
+        "tasks": null
+      }
+    },
+    "dispatch.main-executor-resume-repeat": {
+      "aggregate": {
+        "active_workers_current": 0,
+        "admitted_workers_total": null,
+        "block_backlog_total": null,
+        "blocked_events_total": null,
+        "blocked_workers_total": null,
+        "idle_workers_current": 0,
+        "nonidle_workers_current": 0,
+        "request_backlog_total": null,
+        "request_events_total": 276,
+        "requested_workers_total": null,
+        "should_narrow_true_total": null,
+        "total_workers_current": 0,
+        "unblocked_events_total": null,
+        "unblocked_workers_total": null,
+        "worker_entries_total": 138,
+        "worker_returns_total": 135
+      },
+      "diagnostics": {
+        "per_bucket": {
+          "active_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "idle_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "nonidle_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "total_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "flags": {
+        "has_admission_feedback": false,
+        "has_block_feedback": false,
+        "has_live_current_counts": true,
+        "has_narrow_feedback": false,
+        "has_per_bucket_diagnostics": true,
+        "pressure_visible": false
+      },
+      "generation": 6,
+      "monotonic_time_ns": null,
+      "status": "ok",
+      "timestamp_kind": "derived_from_artifact",
+      "workload": {
+        "delay_ms": 20,
+        "domain": "dispatch",
+        "mode": "main-executor-resume-repeat",
+        "rounds": 64,
+        "tasks": 8
+      }
+    },
+    "dispatch.pressure": {
+      "aggregate": {
+        "active_workers_current": null,
+        "admitted_workers_total": 4,
+        "block_backlog_total": 0,
+        "blocked_events_total": 9,
+        "blocked_workers_total": 9,
+        "idle_workers_current": null,
+        "nonidle_workers_current": null,
+        "request_backlog_total": 10,
+        "request_events_total": 9,
+        "requested_workers_total": 14,
+        "should_narrow_true_total": null,
+        "total_workers_current": null,
+        "unblocked_events_total": 9,
+        "unblocked_workers_total": 9,
+        "worker_entries_total": 4,
+        "worker_returns_total": null
+      },
+      "diagnostics": {
+        "per_bucket": {
+          "admitted_workers": [
+            0,
+            0,
+            0,
+            3,
+            0,
+            1
+          ],
+          "blocked_workers": [
+            0,
+            0,
+            0,
+            8,
+            0,
+            1
+          ],
+          "requested_workers": [
+            0,
+            0,
+            0,
+            13,
+            0,
+            1
+          ],
+          "unblocked_workers": [
+            0,
+            0,
+            0,
+            8,
+            0,
+            1
+          ]
+        }
+      },
+      "flags": {
+        "has_admission_feedback": true,
+        "has_block_feedback": true,
+        "has_live_current_counts": false,
+        "has_narrow_feedback": false,
+        "has_per_bucket_diagnostics": true,
+        "pressure_visible": true
+      },
+      "generation": 2,
+      "monotonic_time_ns": null,
+      "status": "ok",
+      "timestamp_kind": "derived_from_artifact",
+      "workload": {
+        "delay_ms": null,
+        "domain": "dispatch",
+        "mode": "pressure",
+        "rounds": null,
+        "tasks": null
+      }
+    },
+    "dispatch.sustained": {
+      "aggregate": {
+        "active_workers_current": 0,
+        "admitted_workers_total": 5,
+        "block_backlog_total": 0,
+        "blocked_events_total": 641,
+        "blocked_workers_total": 641,
+        "idle_workers_current": 0,
+        "nonidle_workers_current": 0,
+        "request_backlog_total": 343,
+        "request_events_total": 65,
+        "requested_workers_total": 348,
+        "should_narrow_true_total": 0,
+        "total_workers_current": 0,
+        "unblocked_events_total": 641,
+        "unblocked_workers_total": 641,
+        "worker_entries_total": 5,
+        "worker_returns_total": 5
+      },
+      "diagnostics": {
+        "per_bucket": {
+          "active_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "admitted_workers": [
+            0,
+            0,
+            0,
+            4,
+            0,
+            1
+          ],
+          "blocked_workers": [
+            0,
+            0,
+            0,
+            640,
+            0,
+            1
+          ],
+          "idle_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "nonidle_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested_workers": [
+            0,
+            0,
+            0,
+            347,
+            0,
+            1
+          ],
+          "total_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "unblocked_workers": [
+            0,
+            0,
+            0,
+            640,
+            0,
+            1
+          ]
+        }
+      },
+      "flags": {
+        "has_admission_feedback": true,
+        "has_block_feedback": true,
+        "has_live_current_counts": true,
+        "has_narrow_feedback": true,
+        "has_per_bucket_diagnostics": true,
+        "pressure_visible": true
+      },
+      "generation": 5,
+      "monotonic_time_ns": null,
+      "status": "ok",
+      "timestamp_kind": "derived_from_artifact",
+      "workload": {
+        "delay_ms": null,
+        "domain": "dispatch",
+        "mode": "sustained",
+        "rounds": null,
+        "tasks": null
+      }
+    },
+    "dispatch.timeout-gap": {
+      "aggregate": {
+        "active_workers_current": 0,
+        "admitted_workers_total": 4,
+        "block_backlog_total": null,
+        "blocked_events_total": null,
+        "blocked_workers_total": null,
+        "idle_workers_current": 0,
+        "nonidle_workers_current": 0,
+        "request_backlog_total": 63,
+        "request_events_total": 23,
+        "requested_workers_total": 67,
+        "should_narrow_true_total": 0,
+        "total_workers_current": 0,
+        "unblocked_events_total": null,
+        "unblocked_workers_total": null,
+        "worker_entries_total": 8,
+        "worker_returns_total": 8
+      },
+      "diagnostics": {
+        "per_bucket": {
+          "active_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "admitted_workers": [
+            0,
+            0,
+            0,
+            4,
+            0,
+            0
+          ],
+          "idle_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "nonidle_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested_workers": [
+            0,
+            0,
+            0,
+            67,
+            0,
+            0
+          ],
+          "total_workers_current": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "flags": {
+        "has_admission_feedback": true,
+        "has_block_feedback": false,
+        "has_live_current_counts": true,
+        "has_narrow_feedback": true,
+        "has_per_bucket_diagnostics": true,
+        "pressure_visible": true
+      },
+      "generation": 4,
+      "monotonic_time_ns": null,
+      "status": "ok",
+      "timestamp_kind": "derived_from_artifact",
+      "workload": {
+        "delay_ms": null,
+        "domain": "dispatch",
+        "mode": "timeout-gap",
+        "rounds": 2,
+        "tasks": null
+      }
+    },
+    "swift.dispatch-control": {
+      "aggregate": {
+        "active_workers_current": null,
+        "admitted_workers_total": null,
+        "block_backlog_total": null,
+        "blocked_events_total": null,
+        "blocked_workers_total": null,
+        "idle_workers_current": null,
+        "nonidle_workers_current": null,
+        "request_backlog_total": null,
+        "request_events_total": 9,
+        "requested_workers_total": null,
+        "should_narrow_true_total": null,
+        "total_workers_current": null,
+        "unblocked_events_total": null,
+        "unblocked_workers_total": null,
+        "worker_entries_total": 4,
+        "worker_returns_total": 4
+      },
+      "diagnostics": {
+        "per_bucket": {}
+      },
+      "flags": {
+        "has_admission_feedback": false,
+        "has_block_feedback": false,
+        "has_live_current_counts": false,
+        "has_narrow_feedback": false,
+        "has_per_bucket_diagnostics": false,
+        "pressure_visible": false
+      },
+      "generation": 7,
+      "monotonic_time_ns": null,
+      "status": "ok",
+      "timestamp_kind": "derived_from_artifact",
+      "workload": {
+        "delay_ms": null,
+        "domain": "swift",
+        "mode": "dispatch-control",
+        "rounds": null,
+        "tasks": 8
+      }
+    },
+    "swift.dispatchmain-taskhandles-after-repeat": {
+      "aggregate": {
+        "active_workers_current": null,
+        "admitted_workers_total": null,
+        "block_backlog_total": null,
+        "blocked_events_total": null,
+        "blocked_workers_total": null,
+        "idle_workers_current": null,
+        "nonidle_workers_current": null,
+        "request_backlog_total": null,
+        "request_events_total": 1168,
+        "requested_workers_total": null,
+        "should_narrow_true_total": null,
+        "total_workers_current": null,
+        "unblocked_events_total": null,
+        "unblocked_workers_total": null,
+        "worker_entries_total": 407,
+        "worker_returns_total": 404
+      },
+      "diagnostics": {
+        "per_bucket": {}
+      },
+      "flags": {
+        "has_admission_feedback": false,
+        "has_block_feedback": false,
+        "has_live_current_counts": false,
+        "has_narrow_feedback": false,
+        "has_per_bucket_diagnostics": false,
+        "pressure_visible": false
+      },
+      "generation": 9,
+      "monotonic_time_ns": null,
+      "status": "ok",
+      "timestamp_kind": "derived_from_artifact",
+      "workload": {
+        "delay_ms": 20,
+        "domain": "swift",
+        "mode": "dispatchmain-taskhandles-after-repeat",
+        "rounds": 64,
+        "tasks": 8
+      }
+    },
+    "swift.mainqueue-resume": {
+      "aggregate": {
+        "active_workers_current": null,
+        "admitted_workers_total": null,
+        "block_backlog_total": null,
+        "blocked_events_total": null,
+        "blocked_workers_total": null,
+        "idle_workers_current": null,
+        "nonidle_workers_current": null,
+        "request_backlog_total": null,
+        "request_events_total": 6,
+        "requested_workers_total": null,
+        "should_narrow_true_total": null,
+        "total_workers_current": null,
+        "unblocked_events_total": null,
+        "unblocked_workers_total": null,
+        "worker_entries_total": 3,
+        "worker_returns_total": 1
+      },
+      "diagnostics": {
+        "per_bucket": {}
+      },
+      "flags": {
+        "has_admission_feedback": false,
+        "has_block_feedback": false,
+        "has_live_current_counts": false,
+        "has_narrow_feedback": false,
+        "has_per_bucket_diagnostics": false,
+        "pressure_visible": false
+      },
+      "generation": 8,
+      "monotonic_time_ns": null,
+      "status": "ok",
+      "timestamp_kind": "derived_from_artifact",
+      "workload": {
+        "delay_ms": null,
+        "domain": "swift",
+        "mode": "mainqueue-resume",
+        "rounds": null,
+        "tasks": null
+      }
+    }
+  },
+  "source_artifact": "benchmarks/baselines/m13-crossover-full-20260417.json",
+  "source_label": "m13-crossover-full-20260417",
+  "source_schema_version": 3
+}

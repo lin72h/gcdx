@@ -11,6 +11,7 @@ defmodule TwqTest.Zig do
   @spec abi(keyword()) :: Command.Result.t()
   def abi(opts \\ []) do
     env = build_env(opts)
+
     Command.run("zig", zig_args(env, ["test-abi"]),
       cd: zig_root(env),
       timeout: env.command_timeout_ms
@@ -21,6 +22,28 @@ defmodule TwqTest.Zig do
   def build(opts \\ []) do
     env = build_env(opts)
     Command.run("zig", zig_args(env, []), cd: zig_root(env), timeout: env.command_timeout_ms)
+  end
+
+  @spec build_hotpath_bench(keyword()) :: Command.Result.t()
+  def build_hotpath_bench(opts \\ []) do
+    env = build_env(opts)
+
+    Command.run("zig", zig_args(env, ["bench-syscall"]),
+      cd: zig_root(env),
+      timeout: env.command_timeout_ms
+    )
+  end
+
+  @spec run_hotpath_suite(keyword()) :: Command.Result.t()
+  def run_hotpath_suite(opts \\ []) do
+    env = build_env(opts)
+    script = Path.join(env.repo_root, "scripts/benchmarks/run-zig-hotpath-suite.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> hotpath_suite_env(opts),
+      timeout: Keyword.get(opts, :suite_timeout_ms, env.command_timeout_ms)
+    )
   end
 
   @spec build_workqueue_probe(keyword()) :: Command.Result.t()
@@ -130,12 +153,22 @@ defmodule TwqTest.Zig do
 
   defp prepare_pthread_stage(%Env{} = env) do
     script = Path.join(env.repo_root, "scripts/libthr/prepare-stage.sh")
-    Command.run(script, [], cd: env.repo_root, env: Env.script_env(env), timeout: env.command_timeout_ms)
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env),
+      timeout: env.command_timeout_ms
+    )
   end
 
   defp prepare_dispatch_stage(%Env{} = env) do
     script = Path.join(env.repo_root, "scripts/libdispatch/prepare-stage.sh")
-    Command.run(script, [], cd: env.repo_root, env: Env.script_env(env), timeout: env.command_timeout_ms)
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env),
+      timeout: env.command_timeout_ms
+    )
   end
 
   defp zig_args(%Env{} = env, steps) do
@@ -149,5 +182,35 @@ defmodule TwqTest.Zig do
       env.zig_global_cache_dir
       | steps
     ]
+  end
+
+  defp hotpath_suite_env(script_env, opts) do
+    option_env = %{
+      benchmark_json: "TWQ_BENCHMARK_JSON",
+      benchmark_label: "TWQ_BENCHMARK_LABEL",
+      serial_log: "TWQ_SERIAL_LOG",
+      should_narrow_samples: "TWQ_ZIG_BENCH_SHOULD_NARROW_SAMPLES",
+      should_narrow_warmup: "TWQ_ZIG_BENCH_SHOULD_NARROW_WARMUP",
+      reqthreads_samples: "TWQ_ZIG_BENCH_REQTHREADS_SAMPLES",
+      reqthreads_warmup: "TWQ_ZIG_BENCH_REQTHREADS_WARMUP",
+      overcommit_samples: "TWQ_ZIG_BENCH_OVERCOMMIT_SAMPLES",
+      overcommit_warmup: "TWQ_ZIG_BENCH_OVERCOMMIT_WARMUP",
+      thread_enter_samples: "TWQ_ZIG_BENCH_THREAD_ENTER_SAMPLES",
+      thread_enter_warmup: "TWQ_ZIG_BENCH_THREAD_ENTER_WARMUP",
+      thread_return_samples: "TWQ_ZIG_BENCH_THREAD_RETURN_SAMPLES",
+      thread_return_warmup: "TWQ_ZIG_BENCH_THREAD_RETURN_WARMUP",
+      thread_transfer_samples: "TWQ_ZIG_BENCH_THREAD_TRANSFER_SAMPLES",
+      thread_transfer_warmup: "TWQ_ZIG_BENCH_THREAD_TRANSFER_WARMUP",
+      request_count: "TWQ_ZIG_BENCH_REQUEST_COUNT",
+      requested_features: "TWQ_ZIG_BENCH_REQUESTED_FEATURES",
+      settle_ms: "TWQ_ZIG_BENCH_SETTLE_MS"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
   end
 end

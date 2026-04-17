@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "platform": "macos",
+  "lane": "m14-swift-dispatchmain-repeat",
+  "metadata": {
+    "os_version": "",
+    "hardware": "",
+    "notes": ""
+  },
+  "workload": {
+    "domain": "swift",
+    "mode": "dispatchmain-taskhandles-after-repeat",
+    "rounds": 64,
+    "tasks": 8,
+    "delay_ms": 20,
+    "steady_start_round": 8,
+    "steady_end_round": 63
+  },
+  "classification": {
+    "default_receives_source_traffic": true,
+    "default_overcommit_receives_mainq_traffic": true,
+    "default_overcommit_continuation_dominant": false
+  },
+  "metrics": {
+    "full_run": {
+      "root_push_mainq_default_overcommit": null,
+      "root_poke_slow_default_overcommit": null,
+      "pthread_workqueue_addthreads_calls": null,
+      "pthread_workqueue_addthreads_requested_threads": null,
+      "root_push_empty_default": null,
+      "root_poke_slow_default": null,
+      "root_push_source_default": null
+    },
+    "steady_state_per_round": {
+      "root_push_mainq_default_overcommit": null,
+      "root_poke_slow_default_overcommit": null,
+      "pthread_workqueue_addthreads_calls": null,
+      "pthread_workqueue_addthreads_requested_threads": null,
+      "root_push_empty_default": null,
+      "root_poke_slow_default": null,
+      "root_push_source_default": null
+    },
+    "per_round": {
+      "root_push_mainq_default_overcommit": [],
+      "root_poke_slow_default_overcommit": [],
+      "pthread_workqueue_addthreads_calls": [],
+      "pthread_workqueue_addthreads_requested_threads": [],
+      "root_push_empty_default": [],
+      "root_poke_slow_default": [],
+      "root_push_source_default": []
+    }
+  }
+}

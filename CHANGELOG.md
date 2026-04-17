@@ -1,5 +1,403 @@
 # CHANGELOG
 
+## 2026-04-17
+
+### Pressure observer smoke is now repo-owned above the aggregate adapter view
+
+The pressure-only boundary now has a first consumer-side proof lane: a
+policyless observer summary above the aggregate adapter surface and below any
+real SPI or integration claim.
+
+What changed:
+
+1. [twq_pressure_provider_observer.h](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_observer.h),
+   [twq_pressure_provider_observer.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_observer.c),
+   and
+   [twq_pressure_provider_observer_probe.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_observer_probe.c)
+   now define and emit a versioned observer summary above
+   `aggregate_view_v1`;
+2. [extract-m15-pressure-provider-observer.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/extract-m15-pressure-provider-observer.py),
+   [compare-m15-pressure-provider-observer-smoke.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/compare-m15-pressure-provider-observer-smoke.py),
+   and
+   [run-m15-pressure-provider-observer-smoke.sh](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/run-m15-pressure-provider-observer-smoke.sh)
+   now provide the repo-owned observer smoke lane;
+3. the first checked-in observer baseline now lives at
+   [m15-pressure-provider-observer-smoke-20260417.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m15-pressure-provider-observer-smoke-20260417.json);
+4. [m15-pressure-provider-observer-smoke.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/m15-pressure-provider-observer-smoke.md)
+   now records the observer boundary explicitly, and the lane is visible to
+   ExUnit through `TwqTest.PressureProviderObserver` plus
+   `TwqTest.VM.run_m15_pressure_provider_observer_smoke/1`.
+
+What this work proved:
+
+1. the aggregate adapter view is sufficient for a consumer-side summary
+   without promoting per-bucket diagnostics;
+2. quiescence can be tracked honestly at the consumer edge through
+   `total_workers_current == 0 && nonidle_workers_current == 0` while
+   `final_pressure_visible` remains independent;
+3. a fresh full guest observer run passes against the checked-in baseline with
+   `verdict=ok`.
+
+### Aggregate adapter pressure-provider smoke is now repo-owned and contract-checked
+
+The pressure-only boundary now has a fourth repo-owned artifact family: a
+versioned aggregate adapter view above the raw preview snapshot and below any
+real SPI claim.
+
+What changed:
+
+1. [twq_pressure_provider_adapter.h](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_adapter.h),
+   [twq_pressure_provider_adapter.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_adapter.c),
+   and
+   [twq_pressure_provider_adapter_probe.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_adapter_probe.c)
+   now define and emit the repo-local aggregate view v1;
+2. [twq_pressure_provider_probe.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_probe.c)
+   now reuses that adapter builder for its aggregate mapping instead of
+   carrying a second copy of the same logic;
+3. [extract-m15-pressure-provider-adapter.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/extract-m15-pressure-provider-adapter.py),
+   [compare-m15-pressure-provider-adapter-smoke.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/compare-m15-pressure-provider-adapter-smoke.py),
+   and
+   [run-m15-pressure-provider-adapter-smoke.sh](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/run-m15-pressure-provider-adapter-smoke.sh)
+   now provide the repo-owned adapter smoke lane;
+4. [m15-pressure-provider-adapter-smoke-20260417.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m15-pressure-provider-adapter-smoke-20260417.json)
+   is the first checked-in adapter baseline;
+5. the machine-readable contract and contract-check lane now cover the
+   derived, live, adapter, and preview families instead of only the earlier
+   three;
+6. [m15-pressure-provider-adapter-smoke.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/m15-pressure-provider-adapter-smoke.md)
+   records the adapter boundary explicitly, and the same lane is visible to
+   ExUnit through `TwqTest.PressureProviderAdapter` and
+   `TwqTest.VM.run_m15_pressure_provider_adapter_smoke/1`.
+
+What this work proved:
+
+1. a fresh guest bootstrap run produced a stable adapter artifact for both
+   `dispatch.pressure` and `dispatch.sustained`;
+2. the checked-in adapter baseline self-compares cleanly with `verdict=ok`;
+3. the contract lane now validates all four current artifact families with
+   `verdict=ok`.
+
+### Raw preview pressure-provider smoke is now repo-owned and contract-checked
+
+The pressure-only boundary now has a third artifact family below the earlier
+derived and live views: a raw preview smoke lane built around a versioned C
+snapshot shape.
+
+What changed:
+
+1. [twq_pressure_provider_preview.h](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_preview.h)
+   and
+   [twq_pressure_provider_preview.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_preview.c)
+   now define the repo-local raw snapshot v1 shape for current pressure data;
+2. [twq_pressure_provider_probe.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_probe.c)
+   now reuses that shared snapshot reader instead of carrying its own
+   duplicated sysctl parsing path;
+3. [twq_pressure_provider_preview_probe.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_preview_probe.c),
+   [extract-m15-pressure-provider-preview.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/extract-m15-pressure-provider-preview.py),
+   [compare-m15-pressure-provider-preview-smoke.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/compare-m15-pressure-provider-preview-smoke.py),
+   and
+   [run-m15-pressure-provider-preview-smoke.sh](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/run-m15-pressure-provider-preview-smoke.sh)
+   now provide the repo-owned raw preview smoke lane;
+4. the first checked-in raw preview baseline now lives at
+   [m15-pressure-provider-preview-smoke-20260417.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m15-pressure-provider-preview-smoke-20260417.json);
+5. the machine-readable contract and contract-check lane now cover the
+   derived, live, and preview artifact families instead of only the earlier
+   two;
+6. [m15-pressure-provider-preview-smoke.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/m15-pressure-provider-preview-smoke.md)
+   now records the preview boundary explicitly, and the same lane is visible
+   to ExUnit through `TwqTest.PressureProviderPreview` and
+   `TwqTest.VM.run_m15_pressure_provider_preview_smoke/1`.
+
+What this work proved:
+
+1. a fresh full guest run now passes against the checked-in preview baseline
+   with `verdict=ok`;
+2. the preview shape stays pressure-only while carrying real generation,
+   real monotonic time, and versioned raw snapshot structure;
+3. the repo now has a contract-checked raw boundary below the higher-level
+   pressure projections without prematurely claiming a callable SPI.
+
+### Pressure-provider contract v1 is now machine-readable and repo-owned
+
+The pressure-provider boundary is no longer defined only by docs plus two
+comparators. The repo now has a checked-in machine-readable contract for that
+surface.
+
+What changed:
+
+1. the checked-in contract now lives at
+   [m15-pressure-provider-contract-v1.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/contracts/m15-pressure-provider-contract-v1.json);
+2. both `extract-m15-pressure-provider.py` and
+   `extract-m15-live-pressure-provider.py` now stamp a shared top-level
+   `contract` object into their artifacts;
+3. the live extractor now also normalizes missing
+   `aggregate.nonidle_workers_current` and
+   `diagnostics.per_bucket.nonidle_workers_current` fields when regenerating
+   from older serial logs, so raw snapshots and summary fields no longer drift
+   apart;
+4. `validate-m15-pressure-provider-contract.py` and
+   `run-m15-pressure-provider-contract-check.sh` now provide the repo-owned
+   contract-validation lane for both the derived and live baselines;
+5. `TwqTest.PressureProviderContract` now exposes the same contract check to
+   ExUnit.
+
+What this work found and fixed:
+
+1. the first contract validator was too strict: it treated every per-bucket
+   field as unconditional whenever diagnostics existed;
+2. that was wrong for the derived artifact, where per-bucket content is
+   conditional on the feedback flags for the mode;
+3. the contract now encodes per-bucket requirements by flag:
+   admission, block, and live-current fields are only required when the
+   corresponding feedback flag is true.
+
+What the new lane proved:
+
+1. the checked-in derived provider baseline conforms to the same contract as
+   the live smoke baseline;
+2. the live baseline now carries `nonidle_workers_current` consistently both
+   in summary fields and in per-snapshot aggregates/diagnostics;
+3. the repo now has a stable machine-readable boundary for future consumers
+   without claiming a system SPI.
+
+### Pressure-provider boundary now uses non-idle current as the live signal
+
+The pressure-provider lanes no longer treat raw `active_workers_current` as the
+main current-pressure signal.
+
+What changed:
+
+1. both `extract-m15-pressure-provider.py` and
+   `csrc/twq_pressure_provider_probe.c` now expose
+   `nonidle_workers_current = total_workers_current - idle_workers_current`
+   as the effective current-pressure field;
+2. both the derived and live baselines were regenerated so that
+   `nonidle_workers_current` is now part of the checked-in pressure-only
+   boundary;
+3. the live smoke comparator and Elixir wrappers now gate quiescence on
+   `final_total_workers_current` and `final_nonidle_workers_current` instead
+   of pretending that raw `active_workers_current` alone is the decisive
+   signal;
+4. raw `active_workers_current` is still emitted and compared, but now only as
+   supporting detail for continuity with the earlier `kern.twq.*` view.
+
+What this work found:
+
+1. the earlier live smoke captures already showed a real mismatch in signal
+   strength:
+   `total_workers_current > 0` with `idle_workers_current = 0` while raw
+   `active_workers_current` often remained `0`;
+2. that meant the older boundary was too weak for current-pressure semantics
+   even though the guest was clearly carrying non-idle workers;
+3. promoting `nonidle_workers_current` fixes that honesty gap without claiming
+   any new SPI or widening the boundary into queue semantics.
+
+What the updated lanes proved:
+
+1. the derived pressure-provider lane still re-derives and compares cleanly
+   against the checked-in crossover artifact with `verdict=ok`;
+2. the fresh guest live smoke rerun now passes cleanly against the updated
+   live baseline with `verdict=ok`;
+3. the repo now has a stronger current-pressure boundary while still staying
+   pressure-only and probe-scoped.
+
+### Live pressure-provider smoke is now a repo-owned lane
+
+The project now has a guest-side live pressure-provider smoke lane instead of
+only the earlier derived pressure-only prep artifact.
+
+What changed:
+
+1. `csrc/twq_pressure_provider_probe.c` now emits live pressure snapshots in
+   the guest with real generation numbers and real monotonic timestamps;
+2. `scripts/bhyve/stage-guest.sh` now stages the optional live
+   pressure-provider probe and wraps the existing `dispatch.pressure` and
+   `dispatch.sustained` modes with capture start/wait helpers;
+3. `extract-m15-live-pressure-provider.py`,
+   `compare-m15-live-pressure-provider-smoke.py`, and
+   `run-m15-live-pressure-provider-smoke.sh` now provide the repo-owned
+   extract/compare/run lane for this live artifact;
+4. the first checked-in live baseline now lives at
+   [m15-live-pressure-provider-smoke-20260417.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m15-live-pressure-provider-smoke-20260417.json);
+5. `TwqTest.LivePressureProvider` and
+   `TwqTest.VM.run_m15_live_pressure_provider_smoke/1` now expose the same
+   live lane to ExUnit and the host harness;
+6. [m15-live-pressure-provider-smoke.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/m15-live-pressure-provider-smoke.md)
+   now records the live boundary explicitly:
+   pressure-only, probe-scoped, real generation and monotonic time, still no
+   SPI claim.
+
+What this work found and fixed:
+
+1. the first live guest bootstrap failed immediately with `EPROTO` at the
+   base snapshot stage because the new probe was incorrectly treating numeric
+   `sysctlbyname()` results as text;
+2. the fix was to use typed numeric reads for scalar `kern.twq.*` counters
+   and keep text parsing only for the comma-delimited bucket arrays, matching
+   the already-working probe pattern elsewhere in the repo;
+3. the live comparator also had an incorrect zero-baseline rule:
+   zero-valued minimum-ratio metrics were being forced to `1.0`, which made a
+   self-compare fail for legitimate `active_workers_current = 0` captures;
+4. that policy is now corrected, so zero-baseline live metrics remain
+   representable without false failures.
+
+What the live lane proved:
+
+1. the guest now emits real live pressure snapshots for both
+   `dispatch.pressure` and `dispatch.sustained`;
+2. the checked-in live baseline captures contiguous generation sequences,
+   increasing monotonic timestamps, pressure visibility, and eventual return
+   to zero current-worker counts;
+3. the repo-owned live smoke lane can now validate that shape in reuse mode
+   and in full guest mode without pretending that the project already has a
+   final provider SPI.
+
+### Post-M13 pressure-provider prep is now a repo-owned lane
+
+The project now has a repo-owned derived pressure-provider lane for future
+upper-layer consumers instead of only a design note about what should sit
+above `GCDX`.
+
+What changed:
+
+1. `scripts/benchmarks/extract-m15-pressure-provider.py` now derives a
+   pressure-only provider artifact from the checked-in schema-3 crossover
+   baseline instead of inventing a new guest probe;
+2. `scripts/benchmarks/compare-m15-pressure-provider-baseline.py` now checks
+   both aggregate pressure values and the boundary shape itself:
+   `schema_version`, `provider_scope`, synthetic generation semantics, and the
+   explicit absence of live monotonic timestamps;
+3. `scripts/benchmarks/run-m15-pressure-provider-prep.sh` now provides the
+   repo-owned shell lane:
+   reuse an existing crossover artifact or generate one, derive the provider
+   view, compare it against the checked-in baseline, and emit
+   `comparison.json`, `comparison.log`, and `summary.md`;
+4. the first checked-in pressure-only baseline now lives at
+   [m15-pressure-provider-20260417.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m15-pressure-provider-20260417.json);
+5. `TwqTest.PressureProvider` and
+   `TwqTest.VM.run_m15_pressure_provider_prep/1` now expose the same derived
+   boundary to ExUnit and the host harness;
+6. [m15-pressure-provider-prep.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/m15-pressure-provider-prep.md)
+   now records the boundary explicitly:
+   pressure upward, mechanism downward, per-bucket detail diagnostic only, no
+   fake live timestamps, and no TCM vocabulary leaking into `TWQ`.
+
+What the lane proved:
+
+1. the checked-in crossover baseline now deterministically reproduces the
+   checked-in pressure-only provider baseline in reuse mode;
+2. the repo-owned shell lane completes cleanly with `verdict=ok`;
+3. the project now has a stable pressure-only prep surface for future
+   consumers without claiming that a live provider SPI already exists.
+
+Current consequence:
+
+1. `M13` no longer ends at "the current floor is green";
+2. the post-`M13` state now has a concrete upward-facing prep boundary for
+   future pressure consumers;
+3. future integration work can start from this pressure-only surface instead
+   of reaching directly into raw `TWQ` or staged `libdispatch` internals.
+
+### M13 formal closeout is now a repo-owned top-level lane
+
+The project now has a single repo-owned command for deciding whether `M13` is
+actually closeable.
+
+What changed:
+
+1. `scripts/benchmarks/run-m13-closeout.sh` now runs the three current
+   closeout conditions together:
+   the low-level one-boot gate, the focused repeat-lane gate, and the
+   `M13.5` full-matrix crossover assessment;
+2. the low-level gate is now composable in the same way as the repeat and
+   crossover lanes:
+   `run-m13-lowlevel-gate.sh` accepts an existing candidate JSON, emits a
+   structured `comparison.json`, and writes a fuller markdown summary;
+3. `compare-m13-lowlevel-baseline.py` now supports `--json-out` and emits a
+   durable verdict payload instead of only a process exit code;
+4. `TwqTest.VM.run_m13_closeout/1` and
+   `TwqTest.VMM13CloseoutTest` now expose the same top-level closeout lane to
+   ExUnit without forcing a guest boot.
+
+What the new lane proved:
+
+1. the low-level gate now passes cleanly in reuse mode with the checked-in
+   combined suite baseline as both baseline and candidate;
+2. the full `M13` closeout wrapper now completes in reuse mode with all three
+   child lanes green and emits `verdict=close_m13`;
+3. the closeout manifest is now written at
+   `/tmp/gcdx-m13-closeout/closeout.json` with child-lane status and summary
+   paths.
+
+Current consequence:
+
+1. there is now one repo-owned answer to the question "is M13 actually
+   closeable?";
+2. the project no longer needs to treat low-level, repeat, and crossover as
+   three unrelated green boxes;
+3. future work can assume the current `M13` floor only after the closeout
+   lane remains green.
+
+### M13.5 full-matrix crossover assessment is now a real repo-owned lane
+
+The project now has a repo-owned closeout lane for the post-M13 state rather
+than only the low-level floor, the focused repeat gate, and the M14 stop
+result.
+
+What changed:
+
+1. `scripts/benchmarks/compare-m13-crossover-baseline.py` now compares the
+   full current dispatch and Swift matrix against a checked-in crossover
+   baseline;
+2. `scripts/benchmarks/run-m13-crossover-assessment.sh` now provides the
+   repo-owned `M13.5` lane:
+   reuse an existing full-matrix artifact or generate a fresh guest run, then
+   emit `comparison.json`, `comparison.log`, and `summary.md`;
+3. the current full-matrix reference is now checked in as
+   [m13-crossover-full-20260417.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m13-crossover-full-20260417.json);
+4. `TwqTest.VM.run_m13_crossover_assessment/1` and
+   `TwqTest.VMM13CrossoverAssessmentTest` now expose the same lane through the
+   host harness;
+5. `m13-5-crossover-boundary.md` now records what is stable, what is frozen,
+   and what is explicitly deferred after the M13 and M14 work.
+
+What the crossover work discovered:
+
+1. the first broad rerun did not just show benchmark drift; it exposed a real
+   staged-`libdispatch` correctness bug on the `dispatch.basic` lane;
+2. the root cause was unsafe root-item classification on the default root
+   queue:
+   some root items are raw continuations, not vtable-backed dispatch objects,
+   so hot-path code that reached `dx_metatype()` / `dx_type()` through those
+   items could fault;
+3. the current local staged `swift-corelibs-libdispatch` checkout now guards
+   those root-item inspections before touching vtable-derived type metadata,
+   and the full nine-mode matrix runs cleanly again.
+
+What the repo-owned lane proved:
+
+1. the new full baseline completes cleanly across:
+   `dispatch.basic`, `dispatch.pressure`, `dispatch.burst-reuse`,
+   `dispatch.timeout-gap`, `dispatch.sustained`,
+   `dispatch.main-executor-resume-repeat`,
+   `swift.dispatch-control`, `swift.mainqueue-resume`, and
+   `swift.dispatchmain-taskhandles-after-repeat`;
+2. a second fresh candidate now compares cleanly against that baseline through
+   the repo-owned lane at
+   `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-crossover-assessment-20260417/summary.md`;
+3. the shared-absence case for `thread_return_count` on
+   `dispatch.basic` and `dispatch.pressure` is now treated as
+   `not_applicable` instead of a false failure in the crossover comparator.
+
+Current consequence:
+
+1. `M13` now has a real closeout lane above the low-level floor and the
+   focused repeat gate;
+2. the project can judge future changes against the full current matrix rather
+   than only against the repeat seam;
+3. the next milestone can be chosen from a real external need instead of
+   continuing blind repeat-lane tuning.
+
 ## 2026-04-16
 
 ### M14 compare tooling now produces repo-native decisions
@@ -138,6 +536,486 @@ Current consequence:
    tuning by default;
 4. a custom-build counter path remains the fallback only if some later M14
    question needs deeper attribution than stock introspection can provide.
+### M13 repeat-lane gate is now a real repo-owned regression lane
+
+The checked-in FreeBSD schema-3 repeat reference is no longer just a file plus
+ad hoc comparison commands. The repo now has a first-class repeat-lane gate
+that can generate a focused guest artifact, compare it against the checked-in
+baseline, and expose the same policy to ExUnit.
+
+What changed:
+
+1. `scripts/benchmarks/run-m13-repeat-gate.sh` now provides the focused
+   FreeBSD repeat-lane gate for
+   `dispatch.main-executor-resume-repeat` and
+   `swift.dispatchmain-taskhandles-after-repeat`;
+2. `scripts/benchmarks/compare-m13-repeat-baseline.py` now compares those
+   focused artifacts against the checked-in schema-3 baseline using the steady
+   state window `8-63`;
+3. `TwqTest.RepeatLane` and `TwqTest.VM.run_m13_repeat_gate/1` now expose the
+   same repeat-lane policy to ExUnit and the host harness;
+4. the guest wrapper bug that had prevented libdispatch round snapshots from
+   appearing in focused repeat runs is now fixed:
+   the outer benchmark wrappers set `TWQ_LIBDISPATCH_COUNTERS=1`, which is the
+   staging-script input that becomes guest-side
+   `LIBDISPATCH_TWQ_COUNTERS=1`;
+5. `extract-m13-baseline.py` and the repeat comparators now align libdispatch
+   per-round deltas by round number instead of requiring a perfect one-to-one
+   snapshot list, so sparse-but-valid control-lane snapshot series no longer
+   cause false gate failures.
+
+What the end-to-end proof run showed:
+
+1. the fresh guest gate artifact at
+   `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-repeat-gate-20260416T-final/m13-repeat-candidate.json`
+   now carries non-empty libdispatch round snapshots for both repeat modes;
+2. the fresh gate summary at
+   `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-repeat-gate-20260416T-final/summary.md`
+   completes with `verdict=ok`;
+3. the C control lane now compares cleanly again at steady state:
+   `reqthreads_per_round=4.13`,
+   `root_push_mainq_default_overcommit_per_round=0.00`, and
+   `root_poke_slow_default_overcommit_per_round=0.00`;
+4. the Swift repeat lane still stays within the checked-in band at steady
+   state:
+   `reqthreads_per_round=16.27`,
+   `root_push_mainq_default_overcommit_per_round=2.98`, and
+   `root_poke_slow_default_overcommit_per_round=2.98`.
+
+Current consequence:
+
+1. the schema-3 FreeBSD repeat reference is now protected by a repo-owned
+   gate, not just by a checked-in JSON artifact;
+2. the M14 stop result is now backed by a durable FreeBSD-side repeat guard as
+   well as the repo-owned macOS comparison lane;
+3. future work can move on from the closed main-queue to
+   `default.overcommit` seam without losing the ability to catch repeat-lane
+   regressions.
+
+### M14 steady-state comparison is now a repo-owned runnable lane
+
+The first stock-macOS stop result is no longer just a note plus ad hoc
+artifacts. The repo now carries the FreeBSD reference, the macOS report, the
+comparison command, and harness-visible checks as one durable lane.
+
+What changed:
+
+1. the current FreeBSD M14 repeat reference is now checked in as
+   [m14-freebsd-round-snapshots-20260416.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m14-freebsd-round-snapshots-20260416.json)
+   instead of living only under the local artifacts directory;
+2. `scripts/benchmarks/compare-m14-steady-state.py` now writes a structured
+   comparison JSON in addition to the human-readable verdict summary;
+3. `scripts/benchmarks/run-m14-comparison.sh` now provides the repo-owned
+   M14 lane: reuse an existing FreeBSD repeat artifact or generate a focused
+   one, compare it against the checked-in macOS report, and emit
+   `comparison.json`, `comparison.log`, and `summary.md`;
+4. `TwqTest.M14Comparison` now exposes the same stop/tune decision to ExUnit,
+   while `TwqTest.Swift.run_m14_comparison/1` wraps the shell lane through the
+   primary harness.
+
+What the repo-owned lane proved:
+
+1. comparing
+   [m14-freebsd-round-snapshots-20260416.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m14-freebsd-round-snapshots-20260416.json)
+   against
+   [m14-macos-stock-introspection-20260416.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m14-macos-stock-introspection-20260416.json)
+   still produces `verdict=stop_tuning_this_seam`;
+2. the primary steady-state rates remain the same checked-in stop result:
+   about `3.21` vs `2.04` main-queue pushes per round and
+   about `3.21` vs `2.04` `default.overcommit poke_slow` per round;
+3. the shell lane now reproduces that verdict end to end at
+   `/tmp/gcdx-m14-script/summary.md` without requiring any manual reconstruction.
+
+Current consequence:
+
+1. M14 is now a durable repo-owned comparison lane, not just a one-off MX
+   coordination result;
+2. the `mainq -> default.overcommit` seam remains closed as a tuning target;
+3. future performance work can assume that decision and move on to other gaps.
+
+### M13 now has a real workqueue wake benchmark gate
+
+The project now has a guest-run benchmark for the warmed idle worker wakeup
+path rather than only raw `TWQ` syscall timing.
+
+What changed:
+
+1. `csrc/twq_workqueue_wake_bench.c` now measures request-to-callback-start
+   latency for a warmed idle worker under both constrained and overcommit
+   priorities;
+2. `scripts/bhyve/stage-guest.sh` now stages and runs the optional benchmark
+   through `TWQ_WORKQUEUE_WAKE_BENCH_BIN`,
+   `TWQ_WORKQUEUE_WAKE_BENCH_ARGS`, and
+   `TWQ_WORKQUEUE_WAKE_BENCH_PLAN`;
+3. `scripts/benchmarks/run-workqueue-wake-bench.sh`,
+   `run-workqueue-wake-suite.sh`, and
+   `run-workqueue-wake-gate.sh` now provide the same one-command guest lane
+   shape as the Zig syscall suite;
+4. `scripts/benchmarks/run-m13-lowlevel-gate.sh` now reruns both the Zig
+   syscall gate and the workqueue wake gate under one repo-owned command and
+   writes a run summary manifest;
+5. `scripts/benchmarks/extract-workqueue-wake-bench.py` and
+   `compare-workqueue-wake-baseline.py` now extract and gate structured wake
+   artifacts against a checked-in baseline;
+6. `TwqTest.Workqueue` now exposes host-side build and guest-suite wrappers
+   for the wake benchmark, while `TwqTest.WorkqueueWake` and its ExUnit
+   coverage normalize and compare the resulting artifacts through the existing
+   harness policy.
+
+What the first full gate proved:
+
+1. `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/workqueue-wake-gate-20260416T095730Z.json`
+   completed with both `wake-default` and `wake-overcommit` at `status=ok`;
+2. both modes preserved a single warmed worker across the measured window:
+   `before_total=1`, `after_total=1`, and `thread_mismatch_count=0`;
+3. both modes produced exact lifecycle counter deltas:
+   `reqthreads_count=512`, `thread_enter_count=256`,
+   `thread_return_count=256`, `thread_transfer_count=0`;
+4. the checked-in suite baseline is now
+   [m13-workqueue-wake-suite-20260416.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m13-workqueue-wake-suite-20260416.json).
+5. the combined low-level gate now passes end-to-end at
+   `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-lowlevel-gate-20260416T100353Z/summary.md`.
+
+Important measurement note:
+
+1. the wake benchmark currently observes `reqthreads_count=2 x samples`
+   because each measured wake request is paired with a return-side request in
+   the current `libthr` flow;
+2. that is intentional baseline behavior right now and should not be treated
+   as a harness bug without a real `libthr` change.
+
+Current consequence:
+
+1. M13 now covers both raw syscall hot paths and the warmed idle worker wake
+   path;
+2. the repo can now rerun that whole low-level floor with one command via
+   `scripts/benchmarks/run-m13-lowlevel-gate.sh`;
+3. the project has a lower-level regression boundary for future wakeup-policy,
+   pre-park, and stack-reuse work that sits below dispatch-level workloads.
+
+### M13 low-level floor is now a one-boot suite-native gate
+
+The top-level M13 low-level regression command no longer stitches two separate
+guest boots together. It now runs the whole low-level floor in one staged boot
+and compares against a suite-native combined baseline.
+
+What changed:
+
+1. `scripts/benchmarks/run-m13-lowlevel-suite.sh` now stages both the Zig
+   syscall suite and the workqueue wake suite into one guest boot;
+2. `scripts/benchmarks/extract-m13-lowlevel-bench.py` now emits one combined
+   artifact with child suites under `suites.zig_hotpath` and
+   `suites.workqueue_wake`;
+3. `scripts/benchmarks/compare-m13-lowlevel-baseline.py` now compares that
+   combined artifact against a combined baseline while reusing the proven
+   child-suite comparators;
+4. `scripts/benchmarks/run-m13-lowlevel-gate.sh` now drives the one-boot
+   suite and compares it against a suite-native combined baseline instead of
+   rerunning two independent gate scripts;
+5. `TwqTest.LowlevelBench` now exposes the same combined artifact shape to
+   ExUnit, and the baseline is covered by unit tests.
+
+What the first one-boot run proved:
+
+1. `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-lowlevel-suite-20260416T101547Z/m13-lowlevel.json`
+   completed with both child suites present under one serial log;
+2. the checked-in combined baseline is now
+   [m13-lowlevel-suite-20260416.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m13-lowlevel-suite-20260416.json);
+3. the one-command gate now passes end-to-end at
+   `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m13-lowlevel-gate-20260416T101704Z/summary.md`.
+
+Current consequence:
+
+1. the project’s low-level M13 floor is now suite-native rather than
+   assembled from separate boots;
+2. future low-level kernel and `libthr` work can be judged against the exact
+   one-boot composition that developers will actually rerun.
+
+### M13 Zig hot-path gate now covers worker lifecycle syscalls
+
+The Zig hot-path suite now measures the worker lifecycle paths that sit below
+the higher-level dispatch and Swift repeat lanes.
+
+What changed:
+
+1. `zig/bench/syscall_hotpath.zig` now supports `thread-enter`,
+   `thread-return`, and `thread-transfer` benchmark modes in addition to the
+   existing `should-narrow` and `reqthreads` modes;
+2. lifecycle modes keep kernel state balanced by pairing measured `enter`,
+   `return`, or `transfer` operations with unmeasured setup/cleanup calls;
+3. the benchmark JSON now includes `thread_transfer_count` alongside the
+   existing `init`, `reqthreads`, `thread_enter`, and `thread_return`
+   counter deltas;
+4. `scripts/benchmarks/run-zig-hotpath-suite.sh` now runs a default six-mode
+   plan in one guest boot;
+5. the CLI comparator and `TwqTest.ZigHotpath` both gate
+   `thread_transfer_count` by default;
+6. ExUnit now checks the lifecycle counter invariants in the checked-in
+   baseline.
+
+What the full lifecycle run proved:
+
+1. `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/zig-hotpath-lifecycle-suite-20260416T215000Z.json`
+   completed with all six modes at `status=ok`;
+2. `thread-enter` recorded `thread_enter_count=256` and
+   `thread_return_count=256`, proving the measured enter path can be
+   balanced cleanly;
+3. `thread-return` recorded the same balanced enter/return deltas while
+   timing the return syscall itself;
+4. `thread-transfer` recorded `thread_transfer_count=256` with balanced
+   enter/return cleanup around the transfer path;
+5. the checked-in suite baseline now reflects this six-mode lifecycle gate.
+
+Important implementation note:
+
+1. the first lifecycle smoke exposed a benchmark-harness bug when the
+   overcommit priority bit was cast through a signed syscall argument;
+2. the fix preserves the raw `u32` priority bits via a bit-cast before
+   passing them through the `i32` syscall slot.
+
+Current consequence:
+
+1. M13 now has a low-level regression gate for the main TWQ query, request,
+   worker enter, worker return, and cross-lane transfer syscalls;
+2. the gate remains strict on `kern.twq.*` counter deltas but intentionally
+   coarse on nanosecond latency drift (`3.0x` plus `1000ns` slack by default)
+   because the normal lane runs in a WITNESS-enabled bhyve guest;
+3. this is the right boundary for future wakeup, stack reuse, `WAITPKG`, and
+   other ISA-assisted experiments.
+
+### M13 Zig hot-path baselines now have repeatable suite and comparison tooling
+
+The new Zig benchmark lane is now usable as a regression lane instead of only a
+one-off measurement path.
+
+What changed:
+
+1. `scripts/bhyve/stage-guest.sh` now accepts
+   `TWQ_ZIG_HOTPATH_BENCH_PLAN`, a newline-separated benchmark argument plan;
+2. `scripts/benchmarks/run-zig-hotpath-bench.sh` can now run either a single
+   mode or a plan-backed suite;
+3. `scripts/benchmarks/run-zig-hotpath-suite.sh` now runs the default
+   `should-narrow`, `reqthreads`, and `reqthreads-overcommit` suite in one
+   guest boot;
+4. `scripts/benchmarks/extract-zig-hotpath-bench.py` now supports `--all`,
+   producing a suite artifact keyed by benchmark mode;
+5. `scripts/benchmarks/compare-zig-hotpath-baseline.py` now compares single
+   or suite artifacts against the checked-in baseline with latency and counter
+   drift gates;
+6. `scripts/benchmarks/run-zig-hotpath-gate.sh` now runs the one-boot suite
+   and immediately compares it against the suite-native baseline;
+7. the Elixir harness now has `TwqTest.ZigHotpath`, so ExUnit can normalize
+   and compare Zig hot-path artifacts directly;
+8. `TwqTest.Zig.run_hotpath_suite/1` now exposes the guest suite through the
+   primary harness wrapper layer.
+
+What the first full-suite run proved:
+
+1. `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/zig-hotpath-suite-default-20260416T201000Z.json`
+   completed with all three benchmark modes at `status=ok`;
+2. the suite-native checked-in baseline is now
+   [m13-zig-hotpath-suite-20260416.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m13-zig-hotpath-suite-20260416.json);
+3. comparing the full-suite artifact against that suite-native baseline
+   passes the new latency and counter gates.
+
+Important measurement note:
+
+1. the earlier
+   [m13-zig-hotpath-initial-20260416.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m13-zig-hotpath-initial-20260416.json)
+   remains useful as historical first data, but it was assembled from three
+   separate guest boots;
+2. its `reqthreads-overcommit` median is lower than the one-boot suite result
+   while p95/p99 and counters remain stable, so the suite-native baseline is
+   the correct gate for future one-boot suite runs.
+
+Current consequence:
+
+1. M13 can now gate low-level `TWQ` syscall latency and counter deltas without
+   rerunning three separate guest boots;
+2. the gate is intentionally strict on raw counter deltas and tolerant on
+   nanosecond latency drift;
+3. a reduced-sample guest smoke produced
+   `/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/zig-hotpath-suite-smoke-20260416T200000Z.json`
+   with all three benchmark modes present and `status=ok`;
+4. the Elixir unit suite now validates the baseline shape and catches synthetic
+   latency regressions without booting a VM;
+5. this gives future syscall-path and ISA experiments a stable benchmark
+   boundary before any new tuning is accepted.
+
+### M13 now has a real Zig hot-path benchmark lane
+
+The placeholder Zig benchmark is gone. The repo now has a guest-run benchmark
+lane that measures real `TWQ` syscall hot paths and archives structured JSON.
+
+What changed:
+
+1. `zig/bench/syscall_hotpath.zig` now emits real benchmark JSON for
+   `should-narrow`, `reqthreads`, and `reqthreads-overcommit`;
+2. `zig/build.zig` now builds that binary as `twq-bench-syscall` via the
+   `bench-syscall` target;
+3. `scripts/bhyve/stage-guest.sh` can now stage and run the optional Zig
+   hot-path benchmark in the guest through `TWQ_ZIG_HOTPATH_BENCH_BIN` and
+   `TWQ_ZIG_HOTPATH_BENCH_ARGS`;
+4. `scripts/benchmarks/run-zig-hotpath-bench.sh` now drives the full guest
+   lane for the benchmark and writes a parsed JSON artifact;
+5. `scripts/benchmarks/extract-zig-hotpath-bench.py` now extracts the final
+   `zig-bench` JSON object from the guest serial log;
+6. the first repo-owned baseline is now checked in at
+   [m13-zig-hotpath-initial-20260416.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m13-zig-hotpath-initial-20260416.json).
+
+What the first guest runs proved:
+
+1. the `should-narrow` guest run now completes cleanly and records
+   `mean_ns=1035`, `median_ns=1012`, `p95_ns=1032`, `p99_ns=1079`, with zero
+   `reqthreads` / `thread_enter` / `thread_return` churn across the measured
+   sample window;
+2. the constrained `reqthreads` guest run records `mean_ns=1151`,
+   `median_ns=1130`, `p95_ns=1196`, `p99_ns=1219`, with
+   `counter_delta.reqthreads_count=256`;
+3. the overcommit `reqthreads` guest run records `mean_ns=524`,
+   `median_ns=402`, `p95_ns=1099`, `p99_ns=1113`, with the same
+   `counter_delta.reqthreads_count=256`;
+4. all three runs report kernel metadata directly in the benchmark JSON:
+   `kernel_ident=TWQDEBUG`, `kernel_osrelease=15.0-STABLE`, and
+   `kernel_bootfile=/boot/TWQDEBUG/kernel`.
+
+Current consequence:
+
+1. `M13` no longer depends on a fake Zig benchmark placeholder;
+2. the project now has a real low-level benchmark subset for the kernel query
+   and request paths;
+3. the next Zig benchmark work can build from a working guest lane instead of
+   scaffolding from scratch.
+
+### M14 now has a stock-macOS stop result for the mainq -> default.overcommit seam
+
+The first native macOS comparison result is now integrated into the repo.
+
+What changed:
+
+1. the MX-side stock-macOS result was normalized into
+   [m14-macos-stock-introspection-20260416.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m14-macos-stock-introspection-20260416.json);
+2. the repo-owned M14 comparison flow now accepts either raw `per_round`
+   arrays or `steady_state_per_round` aggregates;
+3. [m14-macos-comparison-lane.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/m14-macos-comparison-lane.md)
+   now records the actual first comparison result instead of only the plan.
+
+What the comparison proved:
+
+1. native macOS shows the same qualitative seam on the Swift repeat lane:
+   main-queue handoff traffic reaches `default.overcommit`;
+2. the default root still carries source traffic on macOS;
+3. the C control lane stays clean on this seam on macOS too;
+4. macOS is lower on the primary steady-state rates, but only by about
+   `1.58x`, not by anything close to the stronger `2x` concern boundary.
+
+Current consequence:
+
+1. the main-queue to `default.overcommit` seam is no longer an active
+   FreeBSD-side tuning target;
+2. the correct decision for this seam is now to stop tuning it on FreeBSD;
+3. future performance work should focus on other gaps, not on suppressing this
+   native-shaped handoff path.
+
+### FreeBSD now has round-boundary libdispatch snapshots for M14
+
+The FreeBSD side no longer stops at full-run libdispatch root counters.
+
+What changed:
+
+1. staged `libdispatch` now exports a narrow
+   `_dispatch_twq_counter_emit_snapshot()` helper that emits structured
+   round-boundary root counter snapshots;
+2. the primary Swift repeat lane and the secondary C repeat lane now emit
+   those snapshots at both `round-start-counters` and `round-ok-counters`;
+3. `scripts/benchmarks/extract-m13-baseline.py` now parses those snapshot
+   lines into schema version `3`, including per-round libdispatch deltas;
+4. `scripts/benchmarks/summarize-m13-baseline.py` now summarizes both full-run
+   and steady-state round averages;
+5. `scripts/benchmarks/compare-m14-steady-state.py`,
+   `benchmarks/m14-macos-template.json`, and
+   `m14-macos-comparison-lane.md` now define the repo-owned M14 intake path.
+
+What the focused guest run proved:
+
+1. the focused repeat-only benchmark run completed successfully and produced
+   [m14-round-snapshots-20260416T000000Z.json](/Users/me/wip-gcd-tbb-fx/artifacts/benchmarks/m14-round-snapshots-20260416T000000Z.json);
+2. that artifact is the first schema-`3` benchmark JSON with per-round
+   libdispatch deltas;
+3. in the primary Swift repeat lane, the steady-state `8-63` window now reads
+   about
+   `3.21 mainq pushes / round`,
+   `3.21 default-overcommit poke_slow / round`,
+   and
+   `18.36 reqthreads / round`;
+4. the secondary C repeat lane stays clean on this seam:
+   `0.00 mainq pushes / round` and
+   `0.00 default-overcommit poke_slow / round`.
+
+Current consequence:
+
+1. the FreeBSD side now has the exact per-round primary metrics M14 needs;
+2. MX/macOS data can now be compared against a steady-state FreeBSD reference
+   without reconstructing rates from full-run totals;
+3. the next decision remains M14 comparison, not more speculative seam
+   suppression.
+
+### M14 is now a Swift-first matched-behavior comparison lane
+
+The macOS comparison lane is no longer described abstractly.
+
+The current MX-side reading sharpens the next step:
+
+1. the primary native macOS workload should be the Swift
+   `dispatchMain()` repeat shape equivalent to
+   `dispatchmain-taskhandles-after-repeat`;
+2. the pure-C `main-executor-resume-repeat` lane should remain a secondary
+   calibration/control lane, not the deciding seam;
+3. the main comparison window should be steady-state rounds `8-63`, not the
+   startup-heavy early rounds;
+4. the primary comparison metrics should be
+   main-queue pushes into `default.overcommit`,
+   `default.overcommit poke_slow`,
+   and `_pthread_workqueue_addthreads` request rate per round;
+5. the current decision boundary is now explicit:
+   if macOS shows the same qualitative split and roughly the same order of
+   magnitude for those steady-state handoff/poke rates, stop tuning this seam
+   on FreeBSD;
+   if macOS is materially lower, especially around `2x` lower on the same
+   `64 x 8 x 20ms` Swift workload, keep tuning.
+
+Current consequence:
+
+1. the current FreeBSD line should not suppress more main-queue to
+   `default.overcommit` traffic before that macOS comparison exists;
+2. the next milestone is not another speculative M13 suppression pass;
+3. the next milestone is a matched M14 behavior comparison with a concrete
+   stop/tune rule.
+
+### Project-state update: M13 is healthy and M14 is now the next decision point
+
+The current project state is better described as "comparison-bound" than
+"blocked."
+
+What changed in the project reading:
+
+1. the current staged stack has no major correctness blocker;
+2. the kernel `TWQ` path, staged `libthr`, staged `libdispatch`, and staged
+   Swift validation lane are all functioning together;
+3. the remaining high-visibility repeat-lane traffic on FreeBSD is now
+   identified more narrowly as main-queue handoff into the default-overcommit
+   root;
+4. that seam appears plausibly native-shaped from both Apple open-source
+   reading and current FreeBSD DTrace evidence.
+
+Current consequence:
+
+1. `M13` remains active for baseline discipline and local regression tooling;
+2. `M14` is now the next milestone in practice, because the project needs
+   native macOS comparison data before suppressing another root-queue traffic
+   class;
+3. the current uncertainty is rate/coalescing versus macOS, not whether the
+   FreeBSD stack fundamentally works.
 
 ### M13 DTrace lane now identifies default-overcommit traffic safely
 

@@ -29,17 +29,19 @@ pub fn build(b: *std.Build) void {
     abi_step.dependOn(&run_abi_tests.step);
 
     const bench = b.addExecutable(.{
-        .name = "twq-bench-thread-return-stub",
+        .name = "twq-bench-syscall",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("bench/thread_return_stub.zig"),
+            .root_source_file = b.path("bench/syscall_hotpath.zig"),
             .target = target,
             .optimize = optimize,
         }),
     });
-    b.installArtifact(bench);
+    bench.linkLibC();
 
-    const bench_step = b.step("bench-thread-return", "Build the thread-return benchmark stub");
-    bench_step.dependOn(&bench.step);
+    const install_bench = b.addInstallArtifact(bench, .{});
+
+    const bench_syscall_step = b.step("bench-syscall", "Build the TWQ syscall hot-path benchmark");
+    bench_syscall_step.dependOn(&install_bench.step);
 
     const workqueue_probe = b.addExecutable(.{
         .name = "twq-workqueue-probe",
@@ -51,8 +53,8 @@ pub fn build(b: *std.Build) void {
     });
     workqueue_probe.linkLibC();
     workqueue_probe.root_module.addIncludePath(.{ .cwd_relative = pthread_include_dir });
-    workqueue_probe.root_module.addLibraryPath(.{ .cwd_relative = libpthread_dir });
-    workqueue_probe.root_module.linkSystemLibrary("thr", .{});
+    workqueue_probe.addLibraryPath(.{ .cwd_relative = libpthread_dir });
+    workqueue_probe.linkSystemLibrary("thr");
 
     const install_workqueue_probe = b.addInstallArtifact(workqueue_probe, .{});
     const workqueue_probe_step = b.step("workqueue-probe", "Build the pthread_workqueue userland probe");

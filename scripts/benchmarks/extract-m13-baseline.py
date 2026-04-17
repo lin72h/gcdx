@@ -18,6 +18,28 @@ SYSCTL_RE = re.compile(r"^(?P<key>kern\.twq\.[^:]+):\s*(?P<value>.+)$")
 LIBDISPATCH_COUNTER_RE = re.compile(
     r"^\[libdispatch-twq-counters\]\s+(?P<body>.+)$"
 )
+LIBDISPATCH_SNAPSHOT_RE = re.compile(
+    r"^\[libdispatch-twq-snapshot\]\s+(?P<body>.+)$"
+)
+
+LIBDISPATCH_SNAPSHOT_KEYS = (
+    "root_push_empty_default",
+    "root_push_append_default",
+    "root_push_empty_default_overcommit",
+    "root_push_append_default_overcommit",
+    "root_push_mainq_default_overcommit",
+    "root_poke_default",
+    "root_poke_default_overcommit",
+    "root_poke_slow_default",
+    "root_poke_slow_default_overcommit",
+    "root_poke_requested_default",
+    "root_poke_requested_default_overcommit",
+    "root_poke_slow_requested_default",
+    "root_poke_slow_requested_default_overcommit",
+    "root_repoke_default",
+    "root_repoke_default_overcommit",
+    "root_repoke_suppressed_after_source_default",
+)
 
 
 def parse_args():
@@ -115,12 +137,26 @@ def collect_round_series(events, key):
     return series
 
 
-def build_round_metrics(events):
-    if not events:
+def round_event_map(events):
+    return {
+        event["round"]: event
+        for event in events
+        if isinstance(event.get("round"), int)
+    }
+
+
+def build_round_metrics(events, libdispatch_snapshots=None):
+    if not events and not libdispatch_snapshots:
         return None
 
     round_start_events = sorted_round_events(events, "round-start-counters")
     round_ok_events = sorted_round_events(events, "round-ok-counters")
+    round_start_snapshots = sorted_round_events(
+        libdispatch_snapshots or [], "round-start-counters"
+    )
+    round_ok_snapshots = sorted_round_events(
+        libdispatch_snapshots or [], "round-ok-counters"
+    )
     metrics = {}
 
     if round_start_events:
@@ -162,6 +198,50 @@ def build_round_metrics(events):
             if series is not None:
                 metrics[f"round_ok_{key}"] = series
 
+    if round_start_snapshots:
+        metrics["libdispatch_round_start_rounds"] = [
+            event["round"] for event in round_start_snapshots
+        ]
+        metrics["libdispatch_round_start_completed_rounds"] = [
+            event.get("completed_rounds", -1) for event in round_start_snapshots
+        ]
+        for key in LIBDISPATCH_SNAPSHOT_KEYS:
+            series = collect_round_series(round_start_snapshots, key)
+            if series is not None:
+                metrics[f"libdispatch_round_start_{key}"] = series
+
+    if round_ok_snapshots:
+        metrics["libdispatch_round_ok_rounds"] = [
+            event["round"] for event in round_ok_snapshots
+        ]
+        metrics["libdispatch_round_ok_completed_rounds"] = [
+            event.get("completed_rounds", -1) for event in round_ok_snapshots
+        ]
+        for key in LIBDISPATCH_SNAPSHOT_KEYS:
+            series = collect_round_series(round_ok_snapshots, key)
+            if series is not None:
+                metrics[f"libdispatch_round_ok_{key}"] = series
+
+    if round_start_snapshots and round_ok_snapshots:
+        round_start_snapshot_map = round_event_map(round_start_snapshots)
+        round_ok_snapshot_map = round_event_map(round_ok_snapshots)
+        common_rounds = sorted(
+            set(round_start_snapshot_map) & set(round_ok_snapshot_map)
+        )
+        if common_rounds:
+            metrics["libdispatch_round_ok_delta_rounds"] = common_rounds
+            for key in LIBDISPATCH_SNAPSHOT_KEYS:
+                deltas = []
+                for round_number in common_rounds:
+                    start_value = round_start_snapshot_map[round_number].get(key)
+                    end_value = round_ok_snapshot_map[round_number].get(key)
+                    if not isinstance(start_value, int) or not isinstance(end_value, int):
+                        deltas = []
+                        break
+                    deltas.append(end_value - start_value)
+                if deltas:
+                    metrics[f"libdispatch_round_ok_{key}_delta"] = deltas
+
     return metrics or None
 
 
@@ -175,6 +255,7 @@ def main():
     progress_events = {"dispatch": {}, "swift": {}}
     counter_sections = {"dispatch": {}, "swift": {}}
     libdispatch_counters = {"dispatch": {}, "swift": {}}
+    libdispatch_snapshots = {"dispatch": {}, "swift": {}}
     metadata = {
         "serial_log": str(serial_log.resolve()),
         "label": args.label,
@@ -194,6 +275,24 @@ def main():
             domain, mode = last_probe_key
             libdispatch_counters[domain].setdefault(mode, []).append(
                 parse_key_value_fields(libdispatch_match.group("body"))
+            )
+            continue
+
+        snapshot_match = LIBDISPATCH_SNAPSHOT_RE.match(line.strip())
+        if snapshot_match:
+            snapshot = parse_key_value_fields(snapshot_match.group("body"))
+            domain = snapshot.get("domain")
+            mode = snapshot.get("mode")
+            phase = snapshot.get("phase")
+            if not isinstance(domain, str) or not isinstance(mode, str) or not isinstance(
+                phase, str
+            ):
+                continue
+            mode = normalize_mode(domain, mode)
+            snapshot["mode"] = mode
+            snapshot["phase"] = phase
+            libdispatch_snapshots.setdefault(domain, {}).setdefault(mode, []).append(
+                snapshot
             )
             continue
 
@@ -254,7 +353,11 @@ def main():
 
     benchmarks = {}
     for domain in ("dispatch", "swift"):
-        all_modes = set(terminal_results[domain]) | set(counter_sections[domain])
+        all_modes = (
+            set(terminal_results[domain])
+            | set(counter_sections[domain])
+            | set(libdispatch_snapshots[domain])
+        )
         for mode in sorted(all_modes):
             before = counter_sections[domain].get(mode, {}).get("before", {})
             after = counter_sections[domain].get(mode, {}).get("after", {})
@@ -273,9 +376,13 @@ def main():
                 "probe": None if result is None else result.get("data"),
                 "progress_events": progress_counts[domain].get(mode, 0),
                 "round_metrics": build_round_metrics(
-                    progress_events[domain].get(mode, [])
+                    progress_events[domain].get(mode, []),
+                    libdispatch_snapshots[domain].get(mode, []),
                 ),
                 "libdispatch_counters": libdispatch_counters[domain].get(mode, []),
+                "libdispatch_round_snapshots": libdispatch_snapshots[domain].get(
+                    mode, []
+                ),
                 "twq_before": before,
                 "twq_after": after,
                 "twq_delta": delta,
@@ -293,7 +400,7 @@ def main():
     output.write_text(
         json.dumps(
             {
-                "schema_version": 2,
+                "schema_version": 3,
                 "metadata": metadata,
                 "summary": summary,
                 "benchmarks": benchmarks,

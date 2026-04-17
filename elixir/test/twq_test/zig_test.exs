@@ -10,6 +10,13 @@ defmodule TwqTest.ZigTest do
     assert result.timed_out? == false
   end
 
+  test "builds the zig syscall hot-path benchmark" do
+    result = Zig.build_hotpath_bench()
+
+    assert result.exit_status == 0
+    assert result.timed_out? == false
+  end
+
   test "builds and runs the zig probe against the stock host baseline" do
     result = Zig.run_probe(probe_args: ["--op", "1"])
 

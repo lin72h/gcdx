@@ -36,6 +36,110 @@ defmodule TwqTest.VM do
     )
   end
 
+  @spec run_m13_repeat_gate(keyword()) :: Command.Result.t()
+  def run_m13_repeat_gate(opts \\ []) do
+    env = build_env(opts)
+    script = Path.join(env.repo_root, "scripts/benchmarks/run-m13-repeat-gate.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> repeat_gate_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
+  @spec run_m13_crossover_assessment(keyword()) :: Command.Result.t()
+  def run_m13_crossover_assessment(opts \\ []) do
+    env = build_env(opts)
+    script = Path.join(env.repo_root, "scripts/benchmarks/run-m13-crossover-assessment.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> crossover_assessment_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
+  @spec run_m13_closeout(keyword()) :: Command.Result.t()
+  def run_m13_closeout(opts \\ []) do
+    env = build_env(opts)
+    script = Path.join(env.repo_root, "scripts/benchmarks/run-m13-closeout.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> closeout_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
+  @spec run_m15_pressure_provider_prep(keyword()) :: Command.Result.t()
+  def run_m15_pressure_provider_prep(opts \\ []) do
+    env = build_env(opts)
+    script = Path.join(env.repo_root, "scripts/benchmarks/run-m15-pressure-provider-prep.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> pressure_provider_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
+  @spec run_m15_live_pressure_provider_smoke(keyword()) :: Command.Result.t()
+  def run_m15_live_pressure_provider_smoke(opts \\ []) do
+    env = build_env(opts)
+
+    script =
+      Path.join(env.repo_root, "scripts/benchmarks/run-m15-live-pressure-provider-smoke.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> live_pressure_provider_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
+  @spec run_m15_pressure_provider_preview_smoke(keyword()) :: Command.Result.t()
+  def run_m15_pressure_provider_preview_smoke(opts \\ []) do
+    env = build_env(opts)
+
+    script =
+      Path.join(env.repo_root, "scripts/benchmarks/run-m15-pressure-provider-preview-smoke.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> preview_pressure_provider_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
+  @spec run_m15_pressure_provider_adapter_smoke(keyword()) :: Command.Result.t()
+  def run_m15_pressure_provider_adapter_smoke(opts \\ []) do
+    env = build_env(opts)
+
+    script =
+      Path.join(env.repo_root, "scripts/benchmarks/run-m15-pressure-provider-adapter-smoke.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> adapter_pressure_provider_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
+  @spec run_m15_pressure_provider_observer_smoke(keyword()) :: Command.Result.t()
+  def run_m15_pressure_provider_observer_smoke(opts \\ []) do
+    env = build_env(opts)
+
+    script =
+      Path.join(env.repo_root, "scripts/benchmarks/run-m15-pressure-provider-observer-smoke.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> observer_pressure_provider_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
   @spec probe_guest(keyword()) :: Result.t()
   def probe_guest(opts \\ []) do
     env = build_env(opts)
@@ -134,7 +238,9 @@ defmodule TwqTest.VM do
             swift_timeout_modes = swift_timeout_modes(serial_log)
             validation_failures = probe_validation_failures(serial_log)
             serial_ok? = not validate_serial? or validation_failures == []
-            exit_ok? = run_result.exit_status in @normal_bhyve_exit_statuses and not run_result.timed_out?
+
+            exit_ok? =
+              run_result.exit_status in @normal_bhyve_exit_statuses and not run_result.timed_out?
 
             payload = %{
               phase: "run",
@@ -194,6 +300,186 @@ defmodule TwqTest.VM do
     if Keyword.get(opts, :dry_run, false), do: ["--dry-run"], else: []
   end
 
+  defp repeat_gate_env(script_env, opts) do
+    option_env = %{
+      m13_repeat_baseline: "TWQ_M13_REPEAT_BASELINE",
+      m13_repeat_candidate_json: "TWQ_M13_REPEAT_CANDIDATE_JSON",
+      m13_repeat_out_dir: "TWQ_M13_REPEAT_OUT_DIR",
+      m13_repeat_comparison_json: "TWQ_M13_REPEAT_COMPARISON_JSON",
+      m13_repeat_comparison_log: "TWQ_M13_REPEAT_COMPARISON_LOG",
+      m13_repeat_summary_md: "TWQ_M13_REPEAT_SUMMARY_MD",
+      m13_repeat_serial_log: "TWQ_M13_REPEAT_SERIAL_LOG",
+      m13_repeat_steady_start: "TWQ_M13_REPEAT_STEADY_START",
+      m13_repeat_steady_end: "TWQ_M13_REPEAT_STEADY_END",
+      m13_repeat_swift_profile: "TWQ_M13_REPEAT_SWIFT_PROFILE"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
+  defp crossover_assessment_env(script_env, opts) do
+    option_env = %{
+      m13_crossover_baseline: "TWQ_M13_CROSSOVER_BASELINE",
+      m13_crossover_candidate_json: "TWQ_M13_CROSSOVER_CANDIDATE_JSON",
+      m13_crossover_out_dir: "TWQ_M13_CROSSOVER_OUT_DIR",
+      m13_crossover_comparison_json: "TWQ_M13_CROSSOVER_COMPARISON_JSON",
+      m13_crossover_comparison_log: "TWQ_M13_CROSSOVER_COMPARISON_LOG",
+      m13_crossover_summary_md: "TWQ_M13_CROSSOVER_SUMMARY_MD",
+      m13_crossover_serial_log: "TWQ_M13_CROSSOVER_SERIAL_LOG",
+      m13_crossover_baseline_log: "TWQ_M13_CROSSOVER_BASELINE_LOG",
+      m13_crossover_steady_start: "TWQ_M13_CROSSOVER_STEADY_START",
+      m13_crossover_steady_end: "TWQ_M13_CROSSOVER_STEADY_END"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
+  defp closeout_env(script_env, opts) do
+    option_env = %{
+      m13_closeout_out_dir: "TWQ_M13_CLOSEOUT_OUT_DIR",
+      m13_closeout_summary_md: "TWQ_M13_CLOSEOUT_SUMMARY_MD",
+      m13_closeout_json: "TWQ_M13_CLOSEOUT_JSON",
+      m13_closeout_lowlevel_baseline: "TWQ_M13_CLOSEOUT_LOWLEVEL_BASELINE",
+      m13_closeout_lowlevel_candidate_json: "TWQ_M13_CLOSEOUT_LOWLEVEL_CANDIDATE_JSON",
+      m13_closeout_repeat_baseline: "TWQ_M13_CLOSEOUT_REPEAT_BASELINE",
+      m13_closeout_repeat_candidate_json: "TWQ_M13_CLOSEOUT_REPEAT_CANDIDATE_JSON",
+      m13_closeout_crossover_baseline: "TWQ_M13_CLOSEOUT_CROSSOVER_BASELINE",
+      m13_closeout_crossover_candidate_json: "TWQ_M13_CLOSEOUT_CROSSOVER_CANDIDATE_JSON"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
+  defp pressure_provider_env(script_env, opts) do
+    option_env = %{
+      m15_pressure_baseline: "TWQ_M15_PRESSURE_BASELINE",
+      m15_pressure_source_artifact: "TWQ_M15_PRESSURE_SOURCE_ARTIFACT",
+      m15_pressure_candidate_json: "TWQ_M15_PRESSURE_CANDIDATE_JSON",
+      m15_pressure_out_dir: "TWQ_M15_PRESSURE_OUT_DIR",
+      m15_pressure_comparison_json: "TWQ_M15_PRESSURE_COMPARISON_JSON",
+      m15_pressure_comparison_log: "TWQ_M15_PRESSURE_COMPARISON_LOG",
+      m15_pressure_summary_md: "TWQ_M15_PRESSURE_SUMMARY_MD"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
+  defp live_pressure_provider_env(script_env, opts) do
+    option_env = %{
+      m15_live_pressure_baseline: "TWQ_M15_LIVE_PRESSURE_BASELINE",
+      m15_live_pressure_candidate_json: "TWQ_M15_LIVE_PRESSURE_CANDIDATE_JSON",
+      m15_live_pressure_out_dir: "TWQ_M15_LIVE_PRESSURE_OUT_DIR",
+      m15_live_pressure_serial_log: "TWQ_M15_LIVE_PRESSURE_SERIAL_LOG",
+      m15_live_pressure_comparison_json: "TWQ_M15_LIVE_PRESSURE_COMPARISON_JSON",
+      m15_live_pressure_comparison_log: "TWQ_M15_LIVE_PRESSURE_COMPARISON_LOG",
+      m15_live_pressure_summary_md: "TWQ_M15_LIVE_PRESSURE_SUMMARY_MD",
+      m15_live_pressure_label: "TWQ_M15_LIVE_PRESSURE_LABEL",
+      m15_live_pressure_capture_modes: "TWQ_M15_LIVE_PRESSURE_CAPTURE_MODES",
+      m15_live_pressure_interval_ms: "TWQ_M15_LIVE_PRESSURE_INTERVAL_MS",
+      m15_live_pressure_pressure_ms: "TWQ_M15_LIVE_PRESSURE_PRESSURE_MS",
+      m15_live_pressure_sustained_ms: "TWQ_M15_LIVE_PRESSURE_SUSTAINED_MS"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
+  defp preview_pressure_provider_env(script_env, opts) do
+    option_env = %{
+      m15_preview_baseline: "TWQ_M15_PREVIEW_BASELINE",
+      m15_preview_candidate_json: "TWQ_M15_PREVIEW_CANDIDATE_JSON",
+      m15_preview_out_dir: "TWQ_M15_PREVIEW_OUT_DIR",
+      m15_preview_serial_log: "TWQ_M15_PREVIEW_SERIAL_LOG",
+      m15_preview_comparison_json: "TWQ_M15_PREVIEW_COMPARISON_JSON",
+      m15_preview_comparison_log: "TWQ_M15_PREVIEW_COMPARISON_LOG",
+      m15_preview_summary_md: "TWQ_M15_PREVIEW_SUMMARY_MD",
+      m15_preview_label: "TWQ_M15_PREVIEW_LABEL",
+      m15_preview_capture_modes: "TWQ_M15_PREVIEW_CAPTURE_MODES",
+      m15_preview_interval_ms: "TWQ_M15_PREVIEW_INTERVAL_MS",
+      m15_preview_pressure_ms: "TWQ_M15_PREVIEW_PRESSURE_MS",
+      m15_preview_sustained_ms: "TWQ_M15_PREVIEW_SUSTAINED_MS"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
+  defp adapter_pressure_provider_env(script_env, opts) do
+    option_env = %{
+      m15_adapter_baseline: "TWQ_M15_ADAPTER_BASELINE",
+      m15_adapter_candidate_json: "TWQ_M15_ADAPTER_CANDIDATE_JSON",
+      m15_adapter_out_dir: "TWQ_M15_ADAPTER_OUT_DIR",
+      m15_adapter_serial_log: "TWQ_M15_ADAPTER_SERIAL_LOG",
+      m15_adapter_comparison_json: "TWQ_M15_ADAPTER_COMPARISON_JSON",
+      m15_adapter_comparison_log: "TWQ_M15_ADAPTER_COMPARISON_LOG",
+      m15_adapter_summary_md: "TWQ_M15_ADAPTER_SUMMARY_MD",
+      m15_adapter_label: "TWQ_M15_ADAPTER_LABEL",
+      m15_adapter_capture_modes: "TWQ_M15_ADAPTER_CAPTURE_MODES",
+      m15_adapter_interval_ms: "TWQ_M15_ADAPTER_INTERVAL_MS",
+      m15_adapter_pressure_ms: "TWQ_M15_ADAPTER_PRESSURE_MS",
+      m15_adapter_sustained_ms: "TWQ_M15_ADAPTER_SUSTAINED_MS"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
+  defp observer_pressure_provider_env(script_env, opts) do
+    option_env = %{
+      m15_observer_baseline: "TWQ_M15_OBSERVER_BASELINE",
+      m15_observer_candidate_json: "TWQ_M15_OBSERVER_CANDIDATE_JSON",
+      m15_observer_out_dir: "TWQ_M15_OBSERVER_OUT_DIR",
+      m15_observer_serial_log: "TWQ_M15_OBSERVER_SERIAL_LOG",
+      m15_observer_comparison_json: "TWQ_M15_OBSERVER_COMPARISON_JSON",
+      m15_observer_comparison_log: "TWQ_M15_OBSERVER_COMPARISON_LOG",
+      m15_observer_summary_md: "TWQ_M15_OBSERVER_SUMMARY_MD",
+      m15_observer_label: "TWQ_M15_OBSERVER_LABEL",
+      m15_observer_capture_modes: "TWQ_M15_OBSERVER_CAPTURE_MODES",
+      m15_observer_interval_ms: "TWQ_M15_OBSERVER_INTERVAL_MS",
+      m15_observer_pressure_ms: "TWQ_M15_OBSERVER_PRESSURE_MS",
+      m15_observer_sustained_ms: "TWQ_M15_OBSERVER_SUSTAINED_MS"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
   defp command_to_map(%Command.Result{} = result) do
     %{
       command: result.command,
@@ -213,10 +499,13 @@ defmodule TwqTest.VM do
     dispatch_probe_lines = dispatch_probe_lines(serial_log)
     swift_probe_lines = swift_probe_lines(serial_log)
     dispatch_basic_line = dispatch_probe_line_for_mode(dispatch_probe_lines, "\"mode\":\"basic\"")
+
     dispatch_pressure_line =
       dispatch_probe_line_for_mode(dispatch_probe_lines, "\"mode\":\"pressure\"")
+
     dispatch_burst_line =
       dispatch_probe_line_for_mode(dispatch_probe_lines, "\"mode\":\"burst-reuse\"")
+
     workqueue_timeout_line =
       dispatch_probe_line_for_mode(workqueue_probe_lines, "\"mode\":\"idle-timeout\"")
 
@@ -227,7 +516,10 @@ defmodule TwqTest.VM do
       dispatch_probe_line_for_mode(dispatch_probe_lines, "\"mode\":\"sustained\"")
 
     dispatch_resume_repeat_line =
-      dispatch_probe_line_for_mode(dispatch_probe_lines, "\"mode\":\"main-executor-resume-repeat\"")
+      dispatch_probe_line_for_mode(
+        dispatch_probe_lines,
+        "\"mode\":\"main-executor-resume-repeat\""
+      )
 
     swift_async_smoke_line =
       dispatch_probe_line_for_mode(swift_probe_lines, "\"mode\":\"async-smoke\"")
@@ -365,9 +657,15 @@ defmodule TwqTest.VM do
       )
 
     [
-      {"zig init rc", probe_line?(probe_lines, "\"mode\":\"init\"", "\"rc\":19", "\"errno_name\":\"OK\"")},
+      {"zig init rc",
+       probe_line?(probe_lines, "\"mode\":\"init\"", "\"rc\":19", "\"errno_name\":\"OK\"")},
       {"zig setup-dispatch rc",
-       probe_line?(probe_lines, "\"mode\":\"setup-dispatch\"", "\"rc\":0", "\"errno_name\":\"OK\"")},
+       probe_line?(
+         probe_lines,
+         "\"mode\":\"setup-dispatch\"",
+         "\"rc\":0",
+         "\"errno_name\":\"OK\""
+       )},
       {"zig reqthreads rc=2",
        probe_line?(probe_lines, "\"mode\":\"reqthreads\"", "\"rc\":2", "\"errno_name\":\"OK\"")},
       {"zig reqthreads rc=4",
@@ -384,17 +682,24 @@ defmodule TwqTest.VM do
        probe_line?(probe_lines, "\"mode\":\"should-narrow\"", "\"rc\":1", "\"errno_name\":\"OK\"")},
       {"zig invalid op EINVAL",
        probe_line?(probe_lines, "\"mode\":\"raw\"", "\"op\":9999", "\"errno_name\":\"EINVAL\"")},
-      {"sysctl busy_window_usecs", String.contains?(serial_log, "kern.twq.busy_window_usecs: 50000")},
+      {"sysctl busy_window_usecs",
+       String.contains?(serial_log, "kern.twq.busy_window_usecs: 50000")},
       {"sysctl init_count", String.contains?(serial_log, "kern.twq.init_count: 3")},
-      {"sysctl thread_enter_count", String.contains?(serial_log, "kern.twq.thread_enter_count: 1")},
-      {"sysctl setup_dispatch_count", String.contains?(serial_log, "kern.twq.setup_dispatch_count: 3")},
+      {"sysctl thread_enter_count",
+       String.contains?(serial_log, "kern.twq.thread_enter_count: 1")},
+      {"sysctl setup_dispatch_count",
+       String.contains?(serial_log, "kern.twq.setup_dispatch_count: 3")},
       {"sysctl reqthreads_count", String.contains?(serial_log, "kern.twq.reqthreads_count: 5")},
-      {"sysctl thread_return_count", String.contains?(serial_log, "kern.twq.thread_return_count: 2")},
-      {"sysctl should_narrow_count", String.contains?(serial_log, "kern.twq.should_narrow_count: 3")},
+      {"sysctl thread_return_count",
+       String.contains?(serial_log, "kern.twq.thread_return_count: 2")},
+      {"sysctl should_narrow_count",
+       String.contains?(serial_log, "kern.twq.should_narrow_count: 3")},
       {"sysctl should_narrow_true_count",
        String.contains?(serial_log, "kern.twq.should_narrow_true_count: 1")},
-      {"sysctl switch_block_count", String.contains?(serial_log, "kern.twq.switch_block_count: 1")},
-      {"sysctl switch_unblock_count", String.contains?(serial_log, "kern.twq.switch_unblock_count: 1")},
+      {"sysctl switch_block_count",
+       String.contains?(serial_log, "kern.twq.switch_block_count: 1")},
+      {"sysctl switch_unblock_count",
+       String.contains?(serial_log, "kern.twq.switch_unblock_count: 1")},
       {"sysctl bucket_thread_enter_total",
        String.contains?(serial_log, "kern.twq.bucket_thread_enter_total: 0,0,0,0,0,1")},
       {"sysctl bucket_req_total",
@@ -414,15 +719,40 @@ defmodule TwqTest.VM do
       {"sysctl bucket_active_current zero",
        String.contains?(serial_log, "kern.twq.bucket_active_current: 0,0,0,0,0,0")},
       {"workqueue supported features",
-       workqueue_probe_line?(workqueue_probe_lines, "\"mode\":\"supported\"", "\"status\":\"ok\"", "\"features\":19")},
+       workqueue_probe_line?(
+         workqueue_probe_lines,
+         "\"mode\":\"supported\"",
+         "\"status\":\"ok\"",
+         "\"features\":19"
+       )},
       {"workqueue init",
-       workqueue_probe_line?(workqueue_probe_lines, "\"mode\":\"init\"", "\"status\":\"ok\"", "\"rc\":0")},
+       workqueue_probe_line?(
+         workqueue_probe_lines,
+         "\"mode\":\"init\"",
+         "\"status\":\"ok\"",
+         "\"rc\":0"
+       )},
       {"workqueue addthreads",
-       workqueue_probe_line?(workqueue_probe_lines, "\"mode\":\"addthreads\"", "\"status\":\"ok\"", "\"rc\":0")},
+       workqueue_probe_line?(
+         workqueue_probe_lines,
+         "\"mode\":\"addthreads\"",
+         "\"status\":\"ok\"",
+         "\"rc\":0"
+       )},
       {"workqueue callbacks observed",
-       workqueue_probe_line?(workqueue_probe_lines, "\"mode\":\"callbacks\"", "\"status\":\"ok\"", "\"observed\":2")},
+       workqueue_probe_line?(
+         workqueue_probe_lines,
+         "\"mode\":\"callbacks\"",
+         "\"status\":\"ok\"",
+         "\"observed\":2"
+       )},
       {"workqueue callbacks priority",
-       workqueue_probe_line?(workqueue_probe_lines, "\"mode\":\"callbacks\"", "\"timed_out\":false", "\"priority\":5376")},
+       workqueue_probe_line?(
+         workqueue_probe_lines,
+         "\"mode\":\"callbacks\"",
+         "\"timed_out\":false",
+         "\"priority\":5376"
+       )},
       {"workqueue timeout status", String.contains?(workqueue_timeout_line, "\"status\":\"ok\"")},
       {"workqueue timeout before exceeds warm floor",
        line_int_value(workqueue_timeout_line, "before_total") >
@@ -454,7 +784,12 @@ defmodule TwqTest.VM do
        section_array_value(workqueue_timeout_after, "kern.twq.bucket_active_current") ==
          [0, 0, 0, 0, 0, 0]},
       {"dispatch supported features",
-       dispatch_probe_line?(dispatch_probe_lines, "\"mode\":\"supported\"", "\"status\":\"ok\"", "\"features\":19")},
+       dispatch_probe_line?(
+         dispatch_probe_lines,
+         "\"mode\":\"supported\"",
+         "\"status\":\"ok\"",
+         "\"features\":19"
+       )},
       {"dispatch basic status", String.contains?(dispatch_basic_line, "\"status\":\"ok\"")},
       {"dispatch basic requested", String.contains?(dispatch_basic_line, "\"requested\":8")},
       {"dispatch basic completed", String.contains?(dispatch_basic_line, "\"completed\":8")},
@@ -508,16 +843,46 @@ defmodule TwqTest.VM do
        section_value(dispatch_pressure_after, "kern.twq.switch_unblock_count") >
          section_value(dispatch_pressure_before, "kern.twq.switch_unblock_count")},
       {"dispatch pressure bucket req delta",
-       bucket_delta(dispatch_pressure_before, dispatch_pressure_after, "kern.twq.bucket_req_total", 3) > 0},
+       bucket_delta(
+         dispatch_pressure_before,
+         dispatch_pressure_after,
+         "kern.twq.bucket_req_total",
+         3
+       ) > 0},
       {"dispatch pressure bucket admit delta",
-       bucket_delta(dispatch_pressure_before, dispatch_pressure_after, "kern.twq.bucket_admit_total", 3) > 0},
+       bucket_delta(
+         dispatch_pressure_before,
+         dispatch_pressure_after,
+         "kern.twq.bucket_admit_total",
+         3
+       ) > 0},
       {"dispatch pressure req exceeds admit",
-       bucket_delta(dispatch_pressure_before, dispatch_pressure_after, "kern.twq.bucket_req_total", 3) >
-         bucket_delta(dispatch_pressure_before, dispatch_pressure_after, "kern.twq.bucket_admit_total", 3)},
+       bucket_delta(
+         dispatch_pressure_before,
+         dispatch_pressure_after,
+         "kern.twq.bucket_req_total",
+         3
+       ) >
+         bucket_delta(
+           dispatch_pressure_before,
+           dispatch_pressure_after,
+           "kern.twq.bucket_admit_total",
+           3
+         )},
       {"dispatch pressure bucket switch_block delta",
-       bucket_delta(dispatch_pressure_before, dispatch_pressure_after, "kern.twq.bucket_switch_block_total", 3) > 0},
+       bucket_delta(
+         dispatch_pressure_before,
+         dispatch_pressure_after,
+         "kern.twq.bucket_switch_block_total",
+         3
+       ) > 0},
       {"dispatch pressure bucket switch_unblock delta",
-       bucket_delta(dispatch_pressure_before, dispatch_pressure_after, "kern.twq.bucket_switch_unblock_total", 3) > 0},
+       bucket_delta(
+         dispatch_pressure_before,
+         dispatch_pressure_after,
+         "kern.twq.bucket_switch_unblock_total",
+         3
+       ) > 0},
       {"dispatch burst status", String.contains?(dispatch_burst_line, "\"status\":\"ok\"")},
       {"dispatch burst timed_out", String.contains?(dispatch_burst_line, "\"timed_out\":false")},
       {"dispatch burst main thread callbacks",
@@ -554,12 +919,34 @@ defmodule TwqTest.VM do
        section_value(dispatch_burst_after, "kern.twq.thread_enter_count") >
          section_value(dispatch_burst_before, "kern.twq.thread_enter_count")},
       {"dispatch burst after bucket total zero",
-       section_array_value(dispatch_burst_after, "kern.twq.bucket_total_current") == [0, 0, 0, 0, 0, 0]},
+       section_array_value(dispatch_burst_after, "kern.twq.bucket_total_current") == [
+         0,
+         0,
+         0,
+         0,
+         0,
+         0
+       ]},
       {"dispatch burst after bucket idle zero",
-       section_array_value(dispatch_burst_after, "kern.twq.bucket_idle_current") == [0, 0, 0, 0, 0, 0]},
+       section_array_value(dispatch_burst_after, "kern.twq.bucket_idle_current") == [
+         0,
+         0,
+         0,
+         0,
+         0,
+         0
+       ]},
       {"dispatch burst after bucket active zero",
-       section_array_value(dispatch_burst_after, "kern.twq.bucket_active_current") == [0, 0, 0, 0, 0, 0]},
-      {"dispatch timeout-gap status", String.contains?(dispatch_timeout_gap_line, "\"status\":\"ok\"")},
+       section_array_value(dispatch_burst_after, "kern.twq.bucket_active_current") == [
+         0,
+         0,
+         0,
+         0,
+         0,
+         0
+       ]},
+      {"dispatch timeout-gap status",
+       String.contains?(dispatch_timeout_gap_line, "\"status\":\"ok\"")},
       {"dispatch timeout-gap timed_out",
        String.contains?(dispatch_timeout_gap_line, "\"timed_out\":false")},
       {"dispatch timeout-gap main thread callbacks",
@@ -596,11 +983,14 @@ defmodule TwqTest.VM do
       {"dispatch timeout-gap after bucket active zero",
        section_array_value(dispatch_timeout_gap_after, "kern.twq.bucket_active_current") ==
          [0, 0, 0, 0, 0, 0]},
-      {"dispatch sustained status", String.contains?(dispatch_sustained_line, "\"status\":\"ok\"")},
-      {"dispatch sustained timed_out", String.contains?(dispatch_sustained_line, "\"timed_out\":false")},
+      {"dispatch sustained status",
+       String.contains?(dispatch_sustained_line, "\"status\":\"ok\"")},
+      {"dispatch sustained timed_out",
+       String.contains?(dispatch_sustained_line, "\"timed_out\":false")},
       {"dispatch sustained main thread callbacks",
        String.contains?(dispatch_sustained_line, "\"main_thread_callbacks\":0")},
-      {"dispatch sustained high ready", String.contains?(dispatch_sustained_line, "\"high_ready\":true")},
+      {"dispatch sustained high ready",
+       String.contains?(dispatch_sustained_line, "\"high_ready\":true")},
       {"dispatch sustained settled idle matches total",
        line_int_value(dispatch_sustained_line, "settled_idle") ==
          line_int_value(dispatch_sustained_line, "settled_total")},
@@ -627,15 +1017,46 @@ defmodule TwqTest.VM do
        section_value(dispatch_sustained_after, "kern.twq.switch_unblock_count") >
          section_value(dispatch_sustained_before, "kern.twq.switch_unblock_count")},
       {"dispatch sustained bucket req delta",
-       bucket_delta(dispatch_sustained_before, dispatch_sustained_after, "kern.twq.bucket_req_total", 3) > 0},
+       bucket_delta(
+         dispatch_sustained_before,
+         dispatch_sustained_after,
+         "kern.twq.bucket_req_total",
+         3
+       ) > 0},
       {"dispatch sustained bucket admit delta",
-       bucket_delta(dispatch_sustained_before, dispatch_sustained_after, "kern.twq.bucket_admit_total", 3) > 0},
+       bucket_delta(
+         dispatch_sustained_before,
+         dispatch_sustained_after,
+         "kern.twq.bucket_admit_total",
+         3
+       ) > 0},
       {"dispatch sustained after bucket total zero",
-       section_array_value(dispatch_sustained_after, "kern.twq.bucket_total_current") == [0, 0, 0, 0, 0, 0]},
+       section_array_value(dispatch_sustained_after, "kern.twq.bucket_total_current") == [
+         0,
+         0,
+         0,
+         0,
+         0,
+         0
+       ]},
       {"dispatch sustained after bucket idle zero",
-       section_array_value(dispatch_sustained_after, "kern.twq.bucket_idle_current") == [0, 0, 0, 0, 0, 0]},
+       section_array_value(dispatch_sustained_after, "kern.twq.bucket_idle_current") == [
+         0,
+         0,
+         0,
+         0,
+         0,
+         0
+       ]},
       {"dispatch sustained after bucket active zero",
-       section_array_value(dispatch_sustained_after, "kern.twq.bucket_active_current") == [0, 0, 0, 0, 0, 0]},
+       section_array_value(dispatch_sustained_after, "kern.twq.bucket_active_current") == [
+         0,
+         0,
+         0,
+         0,
+         0,
+         0
+       ]},
       {"dispatch resume-repeat status",
        dispatch_resume_repeat_line == "" or
          String.contains?(dispatch_resume_repeat_line, "\"status\":\"ok\"")},
@@ -693,7 +1114,8 @@ defmodule TwqTest.VM do
          section_value(swift_dispatch_before, "kern.twq.thread_enter_count")},
       {"swift mainqueue-resume status",
        String.contains?(swift_mainqueue_resume_line, "\"status\":\"ok\"")},
-      {"swift mainqueue-resume value", String.contains?(swift_mainqueue_resume_line, "\"value\":42")},
+      {"swift mainqueue-resume value",
+       String.contains?(swift_mainqueue_resume_line, "\"value\":42")},
       {"swift mainqueue-resume reqthreads_count delta",
        section_value(swift_mainqueue_resume_after, "kern.twq.reqthreads_count") >
          section_value(swift_mainqueue_resume_before, "kern.twq.reqthreads_count")},

@@ -11,8 +11,18 @@ Environment:
   TWQ_KERNEL_CONF           Kernel config name to install (default: TWQDEBUG)
   TWQ_KERNEL_OBJDIRPREFIX   Kernel objdir prefix (default: /tmp/twqobj)
   TWQ_PROBE_BIN             Probe binary to copy into the guest
+  TWQ_ZIG_HOTPATH_BENCH_BIN Optional Zig hot-path benchmark binary to copy
+  TWQ_ZIG_HOTPATH_BENCH_ARGS Optional arguments passed to the Zig hot-path benchmark in the guest
+  TWQ_ZIG_HOTPATH_BENCH_PLAN Optional newline-separated Zig hot-path benchmark argument plan
+  TWQ_WORKQUEUE_WAKE_BENCH_BIN Optional workqueue wake benchmark binary to copy
+  TWQ_WORKQUEUE_WAKE_BENCH_ARGS Optional arguments passed to the workqueue wake benchmark in the guest
+  TWQ_WORKQUEUE_WAKE_BENCH_PLAN Optional newline-separated workqueue wake benchmark argument plan
   TWQ_WORKQUEUE_PROBE_BIN   Userland pthread_workqueue probe to copy
   TWQ_DISPATCH_PROBE_BIN    Userland libdispatch probe to copy
+  TWQ_PRESSURE_PROVIDER_PROBE_BIN Optional live pressure-provider probe to copy
+  TWQ_PRESSURE_PROVIDER_ADAPTER_PROBE_BIN Optional aggregate adapter pressure-provider probe to copy
+  TWQ_PRESSURE_PROVIDER_OBSERVER_PROBE_BIN Optional observer-summary pressure-provider probe to copy
+  TWQ_PRESSURE_PROVIDER_PREVIEW_PROBE_BIN Optional raw preview pressure-provider probe to copy
   TWQ_SWIFT_ASYNC_SMOKE_BIN     Swift async smoke probe to copy
   TWQ_SWIFT_ASYNC_YIELD_BIN     Swift async yield probe to copy
   TWQ_SWIFT_ASYNC_SLEEP_BIN     Swift async sleep probe to copy
@@ -64,6 +74,22 @@ Environment:
   TWQ_SWIFT_CONCURRENCY_OVERRIDE_SO Optional replacement libswift_Concurrency.so used while refreshing Swift stage
   TWQ_SWIFT_PROBE_PROFILE   `validation` for the stable Swift lane, `full` for diagnostics too
   TWQ_DISPATCH_PROBE_FILTER Optional comma-separated dispatch probe mode filter
+  TWQ_PRESSURE_PROVIDER_CAPTURE_MODES Optional comma-separated dispatch modes to sample live pressure for (`pressure`,`sustained`)
+  TWQ_PRESSURE_PROVIDER_INTERVAL_MS Sampling interval for the live pressure probe (default: 50)
+  TWQ_PRESSURE_PROVIDER_PRESSURE_DURATION_MS Live capture duration for dispatch pressure mode (default: 2500)
+  TWQ_PRESSURE_PROVIDER_SUSTAINED_DURATION_MS Live capture duration for dispatch sustained mode (default: 12000)
+  TWQ_PRESSURE_PROVIDER_ADAPTER_CAPTURE_MODES Optional comma-separated dispatch modes to sample aggregate adapter pressure for (`pressure`,`sustained`)
+  TWQ_PRESSURE_PROVIDER_ADAPTER_INTERVAL_MS Sampling interval for the adapter pressure probe (default: 50)
+  TWQ_PRESSURE_PROVIDER_ADAPTER_PRESSURE_DURATION_MS Adapter capture duration for dispatch pressure mode (default: 2500)
+  TWQ_PRESSURE_PROVIDER_ADAPTER_SUSTAINED_DURATION_MS Adapter capture duration for dispatch sustained mode (default: 12000)
+  TWQ_PRESSURE_PROVIDER_OBSERVER_CAPTURE_MODES Optional comma-separated dispatch modes to sample observer summaries for (`pressure`,`sustained`)
+  TWQ_PRESSURE_PROVIDER_OBSERVER_INTERVAL_MS Sampling interval for the observer pressure probe (default: 50)
+  TWQ_PRESSURE_PROVIDER_OBSERVER_PRESSURE_DURATION_MS Observer capture duration for dispatch pressure mode (default: 2500)
+  TWQ_PRESSURE_PROVIDER_OBSERVER_SUSTAINED_DURATION_MS Observer capture duration for dispatch sustained mode (default: 12000)
+  TWQ_PRESSURE_PROVIDER_PREVIEW_CAPTURE_MODES Optional comma-separated dispatch modes to sample raw preview pressure for (`pressure`,`sustained`)
+  TWQ_PRESSURE_PROVIDER_PREVIEW_INTERVAL_MS Sampling interval for the preview pressure probe (default: 50)
+  TWQ_PRESSURE_PROVIDER_PREVIEW_PRESSURE_DURATION_MS Preview capture duration for dispatch pressure mode (default: 2500)
+  TWQ_PRESSURE_PROVIDER_PREVIEW_SUSTAINED_DURATION_MS Preview capture duration for dispatch sustained mode (default: 12000)
   TWQ_SWIFT_PROBE_FILTER    Optional comma-separated Swift probe mode filter
   TWQ_SWIFT_RUNTIME_TRACE   Optional value for SWIFT_TWQ_TRACE_CONCURRENCY inside guest
 EOF
@@ -97,8 +123,18 @@ guest_root=${TWQ_GUEST_ROOT:-}
 kernel_conf=${TWQ_KERNEL_CONF:-TWQDEBUG}
 kernel_objdirprefix=${TWQ_KERNEL_OBJDIRPREFIX:-/tmp/twqobj}
 probe_bin=${TWQ_PROBE_BIN:-${repo_root}/../artifacts/zig/prefix/bin/twq-probe-stub}
+zig_hotpath_bench_bin=${TWQ_ZIG_HOTPATH_BENCH_BIN:-${repo_root}/../artifacts/zig/prefix/bin/twq-bench-syscall}
+zig_hotpath_bench_args=${TWQ_ZIG_HOTPATH_BENCH_ARGS:-}
+zig_hotpath_bench_plan=${TWQ_ZIG_HOTPATH_BENCH_PLAN:-}
+workqueue_wake_bench_bin=${TWQ_WORKQUEUE_WAKE_BENCH_BIN:-${repo_root}/../artifacts/zig/prefix/bin/twq-bench-workqueue-wake}
+workqueue_wake_bench_args=${TWQ_WORKQUEUE_WAKE_BENCH_ARGS:-}
+workqueue_wake_bench_plan=${TWQ_WORKQUEUE_WAKE_BENCH_PLAN:-}
 workqueue_probe_bin=${TWQ_WORKQUEUE_PROBE_BIN:-${repo_root}/../artifacts/zig/prefix/bin/twq-workqueue-probe}
 dispatch_probe_bin=${TWQ_DISPATCH_PROBE_BIN:-${repo_root}/../artifacts/zig/prefix/bin/twq-dispatch-probe}
+pressure_provider_probe_bin=${TWQ_PRESSURE_PROVIDER_PROBE_BIN:-${repo_root}/../artifacts/pressure-provider/bin/twq-pressure-provider-probe}
+pressure_provider_adapter_probe_bin=${TWQ_PRESSURE_PROVIDER_ADAPTER_PROBE_BIN:-${repo_root}/../artifacts/pressure-provider/bin/twq-pressure-provider-adapter-probe}
+pressure_provider_observer_probe_bin=${TWQ_PRESSURE_PROVIDER_OBSERVER_PROBE_BIN:-${repo_root}/../artifacts/pressure-provider/bin/twq-pressure-provider-observer-probe}
+pressure_provider_preview_probe_bin=${TWQ_PRESSURE_PROVIDER_PREVIEW_PROBE_BIN:-${repo_root}/../artifacts/pressure-provider/bin/twq-pressure-provider-preview-probe}
 swift_async_smoke_bin=${TWQ_SWIFT_ASYNC_SMOKE_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-async-smoke}
 swift_async_yield_bin=${TWQ_SWIFT_ASYNC_YIELD_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-async-yield}
 swift_async_sleep_bin=${TWQ_SWIFT_ASYNC_SLEEP_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-async-sleep}
@@ -152,6 +188,22 @@ prepare_swift_stage=${TWQ_PREPARE_SWIFT_STAGE:-}
 swift_concurrency_override_so=${TWQ_SWIFT_CONCURRENCY_OVERRIDE_SO:-}
 swift_probe_profile=${TWQ_SWIFT_PROBE_PROFILE:-validation}
 dispatch_probe_filter=${TWQ_DISPATCH_PROBE_FILTER:-}
+pressure_provider_capture_modes=${TWQ_PRESSURE_PROVIDER_CAPTURE_MODES:-}
+pressure_provider_interval_ms=${TWQ_PRESSURE_PROVIDER_INTERVAL_MS:-50}
+pressure_provider_pressure_duration_ms=${TWQ_PRESSURE_PROVIDER_PRESSURE_DURATION_MS:-2500}
+pressure_provider_sustained_duration_ms=${TWQ_PRESSURE_PROVIDER_SUSTAINED_DURATION_MS:-12000}
+pressure_provider_adapter_capture_modes=${TWQ_PRESSURE_PROVIDER_ADAPTER_CAPTURE_MODES:-}
+pressure_provider_adapter_interval_ms=${TWQ_PRESSURE_PROVIDER_ADAPTER_INTERVAL_MS:-50}
+pressure_provider_adapter_pressure_duration_ms=${TWQ_PRESSURE_PROVIDER_ADAPTER_PRESSURE_DURATION_MS:-2500}
+pressure_provider_adapter_sustained_duration_ms=${TWQ_PRESSURE_PROVIDER_ADAPTER_SUSTAINED_DURATION_MS:-12000}
+pressure_provider_observer_capture_modes=${TWQ_PRESSURE_PROVIDER_OBSERVER_CAPTURE_MODES:-}
+pressure_provider_observer_interval_ms=${TWQ_PRESSURE_PROVIDER_OBSERVER_INTERVAL_MS:-50}
+pressure_provider_observer_pressure_duration_ms=${TWQ_PRESSURE_PROVIDER_OBSERVER_PRESSURE_DURATION_MS:-2500}
+pressure_provider_observer_sustained_duration_ms=${TWQ_PRESSURE_PROVIDER_OBSERVER_SUSTAINED_DURATION_MS:-12000}
+pressure_provider_preview_capture_modes=${TWQ_PRESSURE_PROVIDER_PREVIEW_CAPTURE_MODES:-}
+pressure_provider_preview_interval_ms=${TWQ_PRESSURE_PROVIDER_PREVIEW_INTERVAL_MS:-50}
+pressure_provider_preview_pressure_duration_ms=${TWQ_PRESSURE_PROVIDER_PREVIEW_PRESSURE_DURATION_MS:-2500}
+pressure_provider_preview_sustained_duration_ms=${TWQ_PRESSURE_PROVIDER_PREVIEW_SUSTAINED_DURATION_MS:-12000}
 swift_probe_filter=${TWQ_SWIFT_PROBE_FILTER:-}
 swift_runtime_trace=${TWQ_SWIFT_RUNTIME_TRACE:-}
 libdispatch_counters=${TWQ_LIBDISPATCH_COUNTERS:-}
@@ -226,8 +278,12 @@ attach image with mdconfig
 mount first freebsd-ufs partition under ${guest_root}
 install kernel ${kernel_conf} from ${kernel_objdirprefix}
 copy probe ${probe_bin} into guest
+copy optional Zig hot-path benchmark ${zig_hotpath_bench_bin} into guest
+copy optional workqueue wake benchmark ${workqueue_wake_bench_bin} into guest
 copy userland probe ${workqueue_probe_bin} into guest
 copy libdispatch probe ${dispatch_probe_bin} into guest
+copy optional live pressure-provider probe ${pressure_provider_probe_bin} into guest
+copy optional raw preview pressure-provider probe ${pressure_provider_preview_probe_bin} into guest
 copy Swift async smoke probe ${swift_async_smoke_bin} into guest
 copy Swift async yield probe ${swift_async_yield_bin} into guest
 copy Swift async sleep probe ${swift_async_sleep_bin} into guest
@@ -272,6 +328,8 @@ write DTrace mode ${dtrace_mode}
 write DTrace target ${dtrace_target}
 write Swift probe profile ${swift_probe_profile}
 write dispatch probe filter ${dispatch_probe_filter}
+write pressure-provider capture modes ${pressure_provider_capture_modes}
+write pressure-provider preview capture modes ${pressure_provider_preview_capture_modes}
 write Swift probe filter ${swift_probe_filter}
 install one-shot twqprobe rc script
 enable serial console loader settings
@@ -323,6 +381,17 @@ if [ ! -x "$probe_bin" ]; then
   exit 66
 fi
 
+if [ -n "$zig_hotpath_bench_args" ] && [ ! -x "$zig_hotpath_bench_bin" ]; then
+  echo "Zig hot-path benchmark binary not found or not executable: $zig_hotpath_bench_bin" >&2
+  exit 66
+fi
+
+if { [ -n "$workqueue_wake_bench_args" ] || [ -n "$workqueue_wake_bench_plan" ]; } &&
+   [ ! -x "$workqueue_wake_bench_bin" ]; then
+  echo "Workqueue wake benchmark binary not found or not executable: $workqueue_wake_bench_bin" >&2
+  exit 66
+fi
+
 if [ ! -x "$workqueue_probe_bin" ]; then
   echo "Workqueue probe binary not found or not executable: $workqueue_probe_bin" >&2
   exit 66
@@ -330,6 +399,11 @@ fi
 
 if [ ! -x "$dispatch_probe_bin" ]; then
   echo "Dispatch probe binary not found or not executable: $dispatch_probe_bin" >&2
+  exit 66
+fi
+
+if [ -n "$pressure_provider_capture_modes" ] && [ ! -x "$pressure_provider_probe_bin" ]; then
+  echo "Pressure-provider probe binary not found or not executable: $pressure_provider_probe_bin" >&2
   exit 66
 fi
 
@@ -559,8 +633,27 @@ stage_diagnostic_kernel_modules
 
 doas install -d -m 755 "$guest_root/root"
 doas install -m 755 "$probe_bin" "$guest_root/root/twq-probe-stub"
+if [ -x "$zig_hotpath_bench_bin" ]; then
+  doas install -m 755 "$zig_hotpath_bench_bin" "$guest_root/root/twq-bench-syscall"
+fi
+if [ -x "$workqueue_wake_bench_bin" ]; then
+  doas install -m 755 "$workqueue_wake_bench_bin" \
+    "$guest_root/root/twq-bench-workqueue-wake"
+fi
 doas install -m 755 "$workqueue_probe_bin" "$guest_root/root/twq-workqueue-probe"
 doas install -m 755 "$dispatch_probe_bin" "$guest_root/root/twq-dispatch-probe"
+if [ -x "$pressure_provider_probe_bin" ]; then
+  doas install -m 755 "$pressure_provider_probe_bin" "$guest_root/root/twq-pressure-provider-probe"
+fi
+if [ -x "$pressure_provider_adapter_probe_bin" ]; then
+  doas install -m 755 "$pressure_provider_adapter_probe_bin" "$guest_root/root/twq-pressure-provider-adapter-probe"
+fi
+if [ -x "$pressure_provider_observer_probe_bin" ]; then
+  doas install -m 755 "$pressure_provider_observer_probe_bin" "$guest_root/root/twq-pressure-provider-observer-probe"
+fi
+if [ -x "$pressure_provider_preview_probe_bin" ]; then
+  doas install -m 755 "$pressure_provider_preview_probe_bin" "$guest_root/root/twq-pressure-provider-preview-probe"
+fi
 doas install -m 755 "$swift_async_smoke_bin" "$guest_root/root/twq-swift-async-smoke"
 doas install -m 755 "$swift_async_yield_bin" "$guest_root/root/twq-swift-async-yield"
 doas install -m 755 "$swift_async_sleep_bin" "$guest_root/root/twq-swift-async-sleep"
@@ -633,8 +726,35 @@ printf '%s\n' "$dtrace_timeout" | doas tee "$guest_root/root/twq-dtrace-timeout"
 printf '%s\n' "$dtrace_rounds" | doas tee "$guest_root/root/twq-dtrace-rounds" >/dev/null
 printf '%s\n' "$dtrace_tasks" | doas tee "$guest_root/root/twq-dtrace-tasks" >/dev/null
 printf '%s\n' "$dtrace_delay_ms" | doas tee "$guest_root/root/twq-dtrace-delay-ms" >/dev/null
+printf '%s\n' "$zig_hotpath_bench_args" | doas tee "$guest_root/root/twq-zig-hotpath-bench-args" >/dev/null
+doas rm -f "$guest_root/root/twq-zig-hotpath-bench-plan"
+if [ -n "$zig_hotpath_bench_plan" ]; then
+  doas install -m 644 "$zig_hotpath_bench_plan" "$guest_root/root/twq-zig-hotpath-bench-plan"
+fi
+printf '%s\n' "$workqueue_wake_bench_args" | doas tee "$guest_root/root/twq-workqueue-wake-bench-args" >/dev/null
+doas rm -f "$guest_root/root/twq-workqueue-wake-bench-plan"
+if [ -n "$workqueue_wake_bench_plan" ]; then
+  doas install -m 644 "$workqueue_wake_bench_plan" \
+    "$guest_root/root/twq-workqueue-wake-bench-plan"
+fi
 printf '%s\n' "$swift_probe_profile" | doas tee "$guest_root/root/twq-swift-profile" >/dev/null
 printf '%s\n' "$dispatch_probe_filter" | doas tee "$guest_root/root/twq-dispatch-filter" >/dev/null
+printf '%s\n' "$pressure_provider_capture_modes" | doas tee "$guest_root/root/twq-pressure-provider-capture-modes" >/dev/null
+printf '%s\n' "$pressure_provider_interval_ms" | doas tee "$guest_root/root/twq-pressure-provider-interval-ms" >/dev/null
+printf '%s\n' "$pressure_provider_pressure_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-pressure-duration-ms" >/dev/null
+printf '%s\n' "$pressure_provider_sustained_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-sustained-duration-ms" >/dev/null
+printf '%s\n' "$pressure_provider_adapter_capture_modes" | doas tee "$guest_root/root/twq-pressure-provider-adapter-capture-modes" >/dev/null
+printf '%s\n' "$pressure_provider_adapter_interval_ms" | doas tee "$guest_root/root/twq-pressure-provider-adapter-interval-ms" >/dev/null
+printf '%s\n' "$pressure_provider_adapter_pressure_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-adapter-pressure-duration-ms" >/dev/null
+printf '%s\n' "$pressure_provider_adapter_sustained_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-adapter-sustained-duration-ms" >/dev/null
+printf '%s\n' "$pressure_provider_observer_capture_modes" | doas tee "$guest_root/root/twq-pressure-provider-observer-capture-modes" >/dev/null
+printf '%s\n' "$pressure_provider_observer_interval_ms" | doas tee "$guest_root/root/twq-pressure-provider-observer-interval-ms" >/dev/null
+printf '%s\n' "$pressure_provider_observer_pressure_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-observer-pressure-duration-ms" >/dev/null
+printf '%s\n' "$pressure_provider_observer_sustained_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-observer-sustained-duration-ms" >/dev/null
+printf '%s\n' "$pressure_provider_preview_capture_modes" | doas tee "$guest_root/root/twq-pressure-provider-preview-capture-modes" >/dev/null
+printf '%s\n' "$pressure_provider_preview_interval_ms" | doas tee "$guest_root/root/twq-pressure-provider-preview-interval-ms" >/dev/null
+printf '%s\n' "$pressure_provider_preview_pressure_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-preview-pressure-duration-ms" >/dev/null
+printf '%s\n' "$pressure_provider_preview_sustained_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-preview-sustained-duration-ms" >/dev/null
 printf '%s\n' "$swift_probe_filter" | doas tee "$guest_root/root/twq-swift-filter" >/dev/null
 printf '%s\n' "$swift_runtime_trace" | doas tee "$guest_root/root/twq-swift-runtime-trace" >/dev/null
 printf '%s\n' "$libdispatch_counters" | doas tee "$guest_root/root/twq-libdispatch-counters" >/dev/null
@@ -705,6 +825,86 @@ if [ -r /root/twq-dispatch-filter ]; then
   dispatch_probe_filter=$(cat /root/twq-dispatch-filter)
 fi
 
+pressure_provider_capture_modes=
+if [ -r /root/twq-pressure-provider-capture-modes ]; then
+  pressure_provider_capture_modes=$(cat /root/twq-pressure-provider-capture-modes)
+fi
+
+pressure_provider_interval_ms=50
+if [ -r /root/twq-pressure-provider-interval-ms ]; then
+  pressure_provider_interval_ms=$(cat /root/twq-pressure-provider-interval-ms)
+fi
+
+pressure_provider_pressure_duration_ms=2500
+if [ -r /root/twq-pressure-provider-pressure-duration-ms ]; then
+  pressure_provider_pressure_duration_ms=$(cat /root/twq-pressure-provider-pressure-duration-ms)
+fi
+
+pressure_provider_sustained_duration_ms=12000
+if [ -r /root/twq-pressure-provider-sustained-duration-ms ]; then
+  pressure_provider_sustained_duration_ms=$(cat /root/twq-pressure-provider-sustained-duration-ms)
+fi
+
+pressure_provider_adapter_capture_modes=
+if [ -r /root/twq-pressure-provider-adapter-capture-modes ]; then
+  pressure_provider_adapter_capture_modes=$(cat /root/twq-pressure-provider-adapter-capture-modes)
+fi
+
+pressure_provider_adapter_interval_ms=50
+if [ -r /root/twq-pressure-provider-adapter-interval-ms ]; then
+  pressure_provider_adapter_interval_ms=$(cat /root/twq-pressure-provider-adapter-interval-ms)
+fi
+
+pressure_provider_adapter_pressure_duration_ms=2500
+if [ -r /root/twq-pressure-provider-adapter-pressure-duration-ms ]; then
+  pressure_provider_adapter_pressure_duration_ms=$(cat /root/twq-pressure-provider-adapter-pressure-duration-ms)
+fi
+
+pressure_provider_adapter_sustained_duration_ms=12000
+if [ -r /root/twq-pressure-provider-adapter-sustained-duration-ms ]; then
+  pressure_provider_adapter_sustained_duration_ms=$(cat /root/twq-pressure-provider-adapter-sustained-duration-ms)
+fi
+
+pressure_provider_observer_capture_modes=
+if [ -r /root/twq-pressure-provider-observer-capture-modes ]; then
+  pressure_provider_observer_capture_modes=$(cat /root/twq-pressure-provider-observer-capture-modes)
+fi
+
+pressure_provider_observer_interval_ms=50
+if [ -r /root/twq-pressure-provider-observer-interval-ms ]; then
+  pressure_provider_observer_interval_ms=$(cat /root/twq-pressure-provider-observer-interval-ms)
+fi
+
+pressure_provider_observer_pressure_duration_ms=2500
+if [ -r /root/twq-pressure-provider-observer-pressure-duration-ms ]; then
+  pressure_provider_observer_pressure_duration_ms=$(cat /root/twq-pressure-provider-observer-pressure-duration-ms)
+fi
+
+pressure_provider_observer_sustained_duration_ms=12000
+if [ -r /root/twq-pressure-provider-observer-sustained-duration-ms ]; then
+  pressure_provider_observer_sustained_duration_ms=$(cat /root/twq-pressure-provider-observer-sustained-duration-ms)
+fi
+
+pressure_provider_preview_capture_modes=
+if [ -r /root/twq-pressure-provider-preview-capture-modes ]; then
+  pressure_provider_preview_capture_modes=$(cat /root/twq-pressure-provider-preview-capture-modes)
+fi
+
+pressure_provider_preview_interval_ms=50
+if [ -r /root/twq-pressure-provider-preview-interval-ms ]; then
+  pressure_provider_preview_interval_ms=$(cat /root/twq-pressure-provider-preview-interval-ms)
+fi
+
+pressure_provider_preview_pressure_duration_ms=2500
+if [ -r /root/twq-pressure-provider-preview-pressure-duration-ms ]; then
+  pressure_provider_preview_pressure_duration_ms=$(cat /root/twq-pressure-provider-preview-pressure-duration-ms)
+fi
+
+pressure_provider_preview_sustained_duration_ms=12000
+if [ -r /root/twq-pressure-provider-preview-sustained-duration-ms ]; then
+  pressure_provider_preview_sustained_duration_ms=$(cat /root/twq-pressure-provider-preview-sustained-duration-ms)
+fi
+
 swift_probe_filter=
 if [ -r /root/twq-swift-filter ]; then
   swift_probe_filter=$(cat /root/twq-swift-filter)
@@ -713,6 +913,16 @@ fi
 swift_runtime_trace=
 if [ -r /root/twq-swift-runtime-trace ]; then
   swift_runtime_trace=$(cat /root/twq-swift-runtime-trace)
+fi
+
+workqueue_wake_bench_args=
+if [ -r /root/twq-workqueue-wake-bench-args ]; then
+  workqueue_wake_bench_args=$(cat /root/twq-workqueue-wake-bench-args)
+fi
+
+workqueue_wake_bench_plan=
+if [ -r /root/twq-workqueue-wake-bench-plan ]; then
+  workqueue_wake_bench_plan=/root/twq-workqueue-wake-bench-plan
 fi
 
 libdispatch_counters=
@@ -769,6 +979,12 @@ dtrace_delay_ms=20
 if [ -r /root/twq-dtrace-delay-ms ]; then
   dtrace_delay_ms=$(cat /root/twq-dtrace-delay-ms)
 fi
+
+zig_hotpath_bench_args=
+if [ -r /root/twq-zig-hotpath-bench-args ]; then
+  zig_hotpath_bench_args=$(cat /root/twq-zig-hotpath-bench-args)
+fi
+zig_hotpath_bench_plan=/root/twq-zig-hotpath-bench-plan
 
 swift_runtime_root=/root/twq-swift/usr/lib/swift/freebsd
 swift_twq_ld=/root/twq-dispatch:${swift_runtime_root}:/root/twq-lib
@@ -866,6 +1082,218 @@ dispatch_probe_selected()
       return 1
       ;;
   esac
+}
+
+pressure_provider_capture_selected()
+{
+  capture_mode=$1
+
+  if [ -z "${pressure_provider_capture_modes}" ]; then
+    return 1
+  fi
+
+  case ",${pressure_provider_capture_modes}," in
+    *,"${capture_mode}",*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+pressure_provider_preview_capture_selected()
+{
+  capture_mode=$1
+
+  if [ -z "${pressure_provider_preview_capture_modes}" ]; then
+    return 1
+  fi
+
+  case ",${pressure_provider_preview_capture_modes}," in
+    *,"${capture_mode}",*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+pressure_provider_adapter_capture_selected()
+{
+  capture_mode=$1
+
+  if [ -z "${pressure_provider_adapter_capture_modes}" ]; then
+    return 1
+  fi
+
+  case ",${pressure_provider_adapter_capture_modes}," in
+    *,"${capture_mode}",*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+pressure_provider_observer_capture_selected()
+{
+  capture_mode=$1
+
+  if [ -z "${pressure_provider_observer_capture_modes}" ]; then
+    return 1
+  fi
+
+  case ",${pressure_provider_observer_capture_modes}," in
+    *,"${capture_mode}",*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+start_pressure_provider_capture()
+{
+  capture_mode=$1
+  capture_duration_ms=$2
+
+  if ! pressure_provider_capture_selected "${capture_mode}"; then
+    return 1
+  fi
+
+  pressure_provider_pid=
+  pressure_provider_mode=
+  echo "=== twq pressure-provider ${capture_mode} capture start ==="
+  /root/twq-pressure-provider-probe \
+    --label "dispatch.${capture_mode}" \
+    --interval-ms "${pressure_provider_interval_ms}" \
+    --duration-ms "${capture_duration_ms}" &
+  pressure_provider_pid=$!
+  pressure_provider_mode=${capture_mode}
+  return 0
+}
+
+wait_pressure_provider_capture()
+{
+  capture_rc=0
+
+  if [ -n "${pressure_provider_pid:-}" ]; then
+    wait "${pressure_provider_pid}" || capture_rc=$?
+    echo "=== twq pressure-provider ${pressure_provider_mode} capture end ==="
+    pressure_provider_pid=
+    pressure_provider_mode=
+  fi
+
+  return "${capture_rc}"
+}
+
+start_pressure_provider_adapter_capture()
+{
+  capture_mode=$1
+  capture_duration_ms=$2
+
+  if ! pressure_provider_adapter_capture_selected "${capture_mode}"; then
+    return 1
+  fi
+
+  pressure_provider_adapter_pid=
+  pressure_provider_adapter_mode=
+  echo "=== twq pressure-provider-adapter ${capture_mode} capture start ==="
+  /root/twq-pressure-provider-adapter-probe \
+    --label "dispatch.${capture_mode}" \
+    --interval-ms "${pressure_provider_adapter_interval_ms}" \
+    --duration-ms "${capture_duration_ms}" &
+  pressure_provider_adapter_pid=$!
+  pressure_provider_adapter_mode=${capture_mode}
+  return 0
+}
+
+wait_pressure_provider_adapter_capture()
+{
+  capture_rc=0
+
+  if [ -n "${pressure_provider_adapter_pid:-}" ]; then
+    wait "${pressure_provider_adapter_pid}" || capture_rc=$?
+    echo "=== twq pressure-provider-adapter ${pressure_provider_adapter_mode} capture end ==="
+    pressure_provider_adapter_pid=
+    pressure_provider_adapter_mode=
+  fi
+
+  return "${capture_rc}"
+}
+
+start_pressure_provider_observer_capture()
+{
+  capture_mode=$1
+  capture_duration_ms=$2
+
+  if ! pressure_provider_observer_capture_selected "${capture_mode}"; then
+    return 1
+  fi
+
+  pressure_provider_observer_pid=
+  pressure_provider_observer_mode=
+  echo "=== twq pressure-provider-observer ${capture_mode} capture start ==="
+  /root/twq-pressure-provider-observer-probe \
+    --label "dispatch.${capture_mode}" \
+    --interval-ms "${pressure_provider_observer_interval_ms}" \
+    --duration-ms "${capture_duration_ms}" &
+  pressure_provider_observer_pid=$!
+  pressure_provider_observer_mode=${capture_mode}
+  return 0
+}
+
+wait_pressure_provider_observer_capture()
+{
+  capture_rc=0
+
+  if [ -n "${pressure_provider_observer_pid:-}" ]; then
+    wait "${pressure_provider_observer_pid}" || capture_rc=$?
+    echo "=== twq pressure-provider-observer ${pressure_provider_observer_mode} capture end ==="
+    pressure_provider_observer_pid=
+    pressure_provider_observer_mode=
+  fi
+
+  return "${capture_rc}"
+}
+
+start_pressure_provider_preview_capture()
+{
+  capture_mode=$1
+  capture_duration_ms=$2
+
+  if ! pressure_provider_preview_capture_selected "${capture_mode}"; then
+    return 1
+  fi
+
+  pressure_provider_preview_pid=
+  pressure_provider_preview_mode=
+  echo "=== twq pressure-provider-preview ${capture_mode} capture start ==="
+  /root/twq-pressure-provider-preview-probe \
+    --label "dispatch.${capture_mode}" \
+    --interval-ms "${pressure_provider_preview_interval_ms}" \
+    --duration-ms "${capture_duration_ms}" &
+  pressure_provider_preview_pid=$!
+  pressure_provider_preview_mode=${capture_mode}
+  return 0
+}
+
+wait_pressure_provider_preview_capture()
+{
+  capture_rc=0
+
+  if [ -n "${pressure_provider_preview_pid:-}" ]; then
+    wait "${pressure_provider_preview_pid}" || capture_rc=$?
+    echo "=== twq pressure-provider-preview ${pressure_provider_preview_mode} capture end ==="
+    pressure_provider_preview_pid=
+    pressure_provider_preview_mode=
+  fi
+
+  return "${capture_rc}"
 }
 
 swift_profile_runs_diagnostics()
@@ -1098,6 +1526,14 @@ log=/var/log/twq-probe.log
     echo "=== twq dispatch basic stats after end ==="
   fi
   if dispatch_probe_selected "pressure"; then
+    pressure_provider_started=0
+    pressure_provider_rc=0
+    pressure_provider_adapter_started=0
+    pressure_provider_adapter_rc=0
+    pressure_provider_observer_started=0
+    pressure_provider_observer_rc=0
+    pressure_provider_preview_started=0
+    pressure_provider_preview_rc=0
     echo "=== twq dispatch pressure stats before ==="
     sysctl kern.twq.init_count \
       kern.twq.setup_dispatch_count \
@@ -1111,7 +1547,31 @@ log=/var/log/twq-probe.log
       kern.twq.bucket_switch_unblock_total
     echo "=== twq dispatch pressure stats before end ==="
     echo "=== twq dispatch pressure probe start ==="
+    if start_pressure_provider_capture "pressure" "${pressure_provider_pressure_duration_ms}"; then
+      pressure_provider_started=1
+    fi
+    if start_pressure_provider_adapter_capture "pressure" "${pressure_provider_adapter_pressure_duration_ms}"; then
+      pressure_provider_adapter_started=1
+    fi
+    if start_pressure_provider_observer_capture "pressure" "${pressure_provider_observer_pressure_duration_ms}"; then
+      pressure_provider_observer_started=1
+    fi
+    if start_pressure_provider_preview_capture "pressure" "${pressure_provider_preview_pressure_duration_ms}"; then
+      pressure_provider_preview_started=1
+    fi
     dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode pressure --tasks 8 --sleep-ms 40 --high-tasks 1 --high-sleep-ms 200 --timeout-ms 5000
+    if [ "${pressure_provider_started}" -ne 0 ]; then
+      wait_pressure_provider_capture || pressure_provider_rc=$?
+    fi
+    if [ "${pressure_provider_adapter_started}" -ne 0 ]; then
+      wait_pressure_provider_adapter_capture || pressure_provider_adapter_rc=$?
+    fi
+    if [ "${pressure_provider_observer_started}" -ne 0 ]; then
+      wait_pressure_provider_observer_capture || pressure_provider_observer_rc=$?
+    fi
+    if [ "${pressure_provider_preview_started}" -ne 0 ]; then
+      wait_pressure_provider_preview_capture || pressure_provider_preview_rc=$?
+    fi
     echo "=== twq dispatch pressure probe end ==="
     echo "=== twq dispatch pressure stats after ==="
     sysctl kern.twq.init_count \
@@ -1125,6 +1585,18 @@ log=/var/log/twq-probe.log
       kern.twq.bucket_switch_block_total \
       kern.twq.bucket_switch_unblock_total
     echo "=== twq dispatch pressure stats after end ==="
+    if [ "${pressure_provider_rc}" -ne 0 ]; then
+      exit "${pressure_provider_rc}"
+    fi
+    if [ "${pressure_provider_adapter_rc}" -ne 0 ]; then
+      exit "${pressure_provider_adapter_rc}"
+    fi
+    if [ "${pressure_provider_observer_rc}" -ne 0 ]; then
+      exit "${pressure_provider_observer_rc}"
+    fi
+    if [ "${pressure_provider_preview_rc}" -ne 0 ]; then
+      exit "${pressure_provider_preview_rc}"
+    fi
   fi
   if dispatch_probe_selected "burst-reuse"; then
     echo "=== twq dispatch burst stats before ==="
@@ -1197,6 +1669,14 @@ log=/var/log/twq-probe.log
     fi
   fi
   if dispatch_probe_selected "sustained"; then
+    pressure_provider_started=0
+    pressure_provider_rc=0
+    pressure_provider_adapter_started=0
+    pressure_provider_adapter_rc=0
+    pressure_provider_observer_started=0
+    pressure_provider_observer_rc=0
+    pressure_provider_preview_started=0
+    pressure_provider_preview_rc=0
     echo "=== twq dispatch sustained stats before ==="
     sysctl kern.twq.init_count \
       kern.twq.setup_dispatch_count \
@@ -1215,8 +1695,32 @@ log=/var/log/twq-probe.log
       kern.twq.bucket_active_current
     echo "=== twq dispatch sustained stats before end ==="
     echo "=== twq dispatch sustained probe start ==="
+    if start_pressure_provider_capture "sustained" "${pressure_provider_sustained_duration_ms}"; then
+      pressure_provider_started=1
+    fi
+    if start_pressure_provider_adapter_capture "sustained" "${pressure_provider_adapter_sustained_duration_ms}"; then
+      pressure_provider_adapter_started=1
+    fi
+    if start_pressure_provider_observer_capture "sustained" "${pressure_provider_observer_sustained_duration_ms}"; then
+      pressure_provider_observer_started=1
+    fi
+    if start_pressure_provider_preview_capture "sustained" "${pressure_provider_preview_sustained_duration_ms}"; then
+      pressure_provider_preview_started=1
+    fi
     sustained_rc=0
     dispatch_trace_env env LD_LIBRARY_PATH=/root/twq-dispatch:/root/twq-lib /root/twq-dispatch-probe --mode sustained --tasks 640 --high-tasks 1 --sleep-ms 40 --high-sleep-ms 200 --sample-ms 100 --settle-ms 6500 --timeout-ms 25000 || sustained_rc=$?
+    if [ "${pressure_provider_started}" -ne 0 ]; then
+      wait_pressure_provider_capture || pressure_provider_rc=$?
+    fi
+    if [ "${pressure_provider_adapter_started}" -ne 0 ]; then
+      wait_pressure_provider_adapter_capture || pressure_provider_adapter_rc=$?
+    fi
+    if [ "${pressure_provider_observer_started}" -ne 0 ]; then
+      wait_pressure_provider_observer_capture || pressure_provider_observer_rc=$?
+    fi
+    if [ "${pressure_provider_preview_started}" -ne 0 ]; then
+      wait_pressure_provider_preview_capture || pressure_provider_preview_rc=$?
+    fi
     echo "=== twq dispatch sustained probe end ==="
     echo "=== twq dispatch sustained stats after ==="
     sysctl kern.twq.init_count \
@@ -1238,8 +1742,82 @@ log=/var/log/twq-probe.log
     if [ "${sustained_rc}" -ne 0 ]; then
       exit "${sustained_rc}"
     fi
+    if [ "${pressure_provider_rc}" -ne 0 ]; then
+      exit "${pressure_provider_rc}"
+    fi
+    if [ "${pressure_provider_adapter_rc}" -ne 0 ]; then
+      exit "${pressure_provider_adapter_rc}"
+    fi
+    if [ "${pressure_provider_observer_rc}" -ne 0 ]; then
+      exit "${pressure_provider_observer_rc}"
+    fi
+    if [ "${pressure_provider_preview_rc}" -ne 0 ]; then
+      exit "${pressure_provider_preview_rc}"
+    fi
   fi
   probe_failure_rc=0
+  if [ -r "${zig_hotpath_bench_plan}" ] && grep -Eq '[^[:space:]]' "${zig_hotpath_bench_plan}"; then
+    echo "=== twq zig hotpath bench start ==="
+    zig_hotpath_bench_rc=0
+    while IFS= read -r zig_hotpath_bench_line || [ -n "${zig_hotpath_bench_line}" ]; do
+      case "${zig_hotpath_bench_line}" in
+        ''|'#'*)
+          continue
+          ;;
+      esac
+      # Intentional word splitting for repo-controlled benchmark plan lines.
+      # shellcheck disable=SC2086
+      /root/twq-bench-syscall ${zig_hotpath_bench_line} || zig_hotpath_bench_rc=$?
+      if [ "${zig_hotpath_bench_rc}" -ne 0 ]; then
+        break
+      fi
+    done < "${zig_hotpath_bench_plan}"
+    echo "=== twq zig hotpath bench end ==="
+    if [ "${zig_hotpath_bench_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+      probe_failure_rc=${zig_hotpath_bench_rc}
+    fi
+  elif [ -n "${zig_hotpath_bench_args}" ]; then
+    echo "=== twq zig hotpath bench start ==="
+    zig_hotpath_bench_rc=0
+    # Intentional word splitting for repo-controlled benchmark args.
+    # shellcheck disable=SC2086
+    /root/twq-bench-syscall ${zig_hotpath_bench_args} || zig_hotpath_bench_rc=$?
+    echo "=== twq zig hotpath bench end ==="
+    if [ "${zig_hotpath_bench_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+      probe_failure_rc=${zig_hotpath_bench_rc}
+    fi
+  fi
+  if [ -r "${workqueue_wake_bench_plan}" ] && grep -Eq '[^[:space:]]' "${workqueue_wake_bench_plan}"; then
+    echo "=== twq workqueue wake bench start ==="
+    workqueue_wake_bench_rc=0
+    while IFS= read -r workqueue_wake_bench_line || [ -n "${workqueue_wake_bench_line}" ]; do
+      case "${workqueue_wake_bench_line}" in
+        ''|'#'*)
+          continue
+          ;;
+      esac
+      # Intentional word splitting for repo-controlled benchmark plan lines.
+      # shellcheck disable=SC2086
+      env LD_LIBRARY_PATH=/root/twq-lib /root/twq-bench-workqueue-wake ${workqueue_wake_bench_line} || workqueue_wake_bench_rc=$?
+      if [ "${workqueue_wake_bench_rc}" -ne 0 ]; then
+        break
+      fi
+    done < "${workqueue_wake_bench_plan}"
+    echo "=== twq workqueue wake bench end ==="
+    if [ "${workqueue_wake_bench_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+      probe_failure_rc=${workqueue_wake_bench_rc}
+    fi
+  elif [ -n "${workqueue_wake_bench_args}" ]; then
+    echo "=== twq workqueue wake bench start ==="
+    workqueue_wake_bench_rc=0
+    # Intentional word splitting for repo-controlled benchmark args.
+    # shellcheck disable=SC2086
+    env LD_LIBRARY_PATH=/root/twq-lib /root/twq-bench-workqueue-wake ${workqueue_wake_bench_args} || workqueue_wake_bench_rc=$?
+    echo "=== twq workqueue wake bench end ==="
+    if [ "${workqueue_wake_bench_rc}" -ne 0 ] && [ "${probe_failure_rc}" -eq 0 ]; then
+      probe_failure_rc=${workqueue_wake_bench_rc}
+    fi
+  fi
   if dispatch_probe_selected "after"; then
     echo "=== twq dispatch after stats before ==="
     sysctl kern.twq.init_count \

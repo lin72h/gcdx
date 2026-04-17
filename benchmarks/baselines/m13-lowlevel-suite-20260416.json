@@ -1,0 +1,360 @@
+{
+  "kernel": {
+    "bootfile": "/boot/TWQDEBUG/kernel",
+    "ident": "TWQDEBUG",
+    "osrelease": "15.0-STABLE"
+  },
+  "label": "m13-lowlevel-suite",
+  "schema_version": 1,
+  "serial_log": "/Users/me/wip-gcd-tbb-fx/wip-codex54x/../artifacts/benchmarks/m13-lowlevel-suite-20260416T101547Z/m13-lowlevel.serial.log",
+  "suites": {
+    "workqueue_wake": {
+      "benchmarks": {
+        "wake_default": {
+          "data": {
+            "after_total": 1,
+            "before_total": 1,
+            "benchmark": "workqueue-wake",
+            "callback_timeout_ms": 3000,
+            "counter_delta": {
+              "init_count": 0,
+              "reqthreads_count": 512,
+              "thread_enter_count": 256,
+              "thread_return_count": 256,
+              "thread_transfer_count": 0
+            },
+            "last_error": 0,
+            "last_priority": 5376,
+            "last_thread_tid": 100139,
+            "max_ns": 127190,
+            "mean_ns": 35312,
+            "median_ns": 33109,
+            "min_ns": 12849,
+            "mode": "wake-default",
+            "p95_ns": 55458,
+            "p99_ns": 75294,
+            "prime_callback_ns": 122949,
+            "prime_thread_tid": 100139,
+            "prime_timeout_ms": 3000,
+            "quiescent_timeout_ms": 3000,
+            "sample_errors": 0,
+            "samples": 256,
+            "settle_ms": 50,
+            "stddev_ns": 14573,
+            "thread_mismatch_count": 0,
+            "warmup": 32
+          },
+          "kind": "workqueue-bench",
+          "meta": {
+            "binary": "twq-bench-workqueue-wake",
+            "component": "c",
+            "kernel_bootfile": "/boot/TWQDEBUG/kernel",
+            "kernel_ident": "TWQDEBUG",
+            "kernel_osrelease": "15.0-STABLE"
+          },
+          "status": "ok"
+        },
+        "wake_overcommit": {
+          "data": {
+            "after_total": 1,
+            "before_total": 1,
+            "benchmark": "workqueue-wake",
+            "callback_timeout_ms": 3000,
+            "counter_delta": {
+              "init_count": 0,
+              "reqthreads_count": 512,
+              "thread_enter_count": 256,
+              "thread_return_count": 256,
+              "thread_transfer_count": 0
+            },
+            "last_error": 0,
+            "last_priority": 2147489024,
+            "last_thread_tid": 100141,
+            "max_ns": 146234,
+            "mean_ns": 28551,
+            "median_ns": 30652,
+            "min_ns": 8935,
+            "mode": "wake-overcommit",
+            "p95_ns": 52835,
+            "p99_ns": 62100,
+            "prime_callback_ns": 175351,
+            "prime_thread_tid": 100141,
+            "prime_timeout_ms": 3000,
+            "quiescent_timeout_ms": 3000,
+            "sample_errors": 0,
+            "samples": 256,
+            "settle_ms": 50,
+            "stddev_ns": 16611,
+            "thread_mismatch_count": 0,
+            "warmup": 32
+          },
+          "kind": "workqueue-bench",
+          "meta": {
+            "binary": "twq-bench-workqueue-wake",
+            "component": "c",
+            "kernel_bootfile": "/boot/TWQDEBUG/kernel",
+            "kernel_ident": "TWQDEBUG",
+            "kernel_osrelease": "15.0-STABLE"
+          },
+          "status": "ok"
+        }
+      },
+      "label": "m13-lowlevel-suite-workqueue-wake",
+      "schema_version": 1,
+      "serial_log": "/Users/me/wip-gcd-tbb-fx/wip-codex54x/../artifacts/benchmarks/m13-lowlevel-suite-20260416T101547Z/m13-lowlevel.serial.log"
+    },
+    "zig_hotpath": {
+      "benchmarks": {
+        "reqthreads": {
+          "data": {
+            "benchmark": "syscall-hotpath",
+            "bool_false_count": 0,
+            "bool_true_count": 0,
+            "counter_delta": {
+              "init_count": 0,
+              "reqthreads_count": 256,
+              "thread_enter_count": 0,
+              "thread_return_count": 0,
+              "thread_transfer_count": 0
+            },
+            "init_features": 19,
+            "last_error": 0,
+            "max_ns": 3765,
+            "mean_ns": 1120,
+            "median_ns": 1109,
+            "min_ns": 1082,
+            "mode": "reqthreads",
+            "p95_ns": 1126,
+            "p99_ns": 1162,
+            "priority": 5376,
+            "request_count": 1,
+            "requested_features": 0,
+            "return_sum": 256,
+            "sample_errors": 0,
+            "samples": 256,
+            "settle_ms": 50,
+            "stddev_ns": 166,
+            "warmup": 32
+          },
+          "kind": "zig-bench",
+          "meta": {
+            "binary": "twq-bench-syscall",
+            "component": "zig",
+            "kernel_bootfile": "/boot/TWQDEBUG/kernel",
+            "kernel_ident": "TWQDEBUG",
+            "kernel_osrelease": "15.0-STABLE"
+          },
+          "status": "ok"
+        },
+        "reqthreads_overcommit": {
+          "data": {
+            "benchmark": "syscall-hotpath",
+            "bool_false_count": 0,
+            "bool_true_count": 0,
+            "counter_delta": {
+              "init_count": 0,
+              "reqthreads_count": 256,
+              "thread_enter_count": 0,
+              "thread_return_count": 0,
+              "thread_transfer_count": 0
+            },
+            "init_features": 19,
+            "last_error": 0,
+            "max_ns": 3842,
+            "mean_ns": 1120,
+            "median_ns": 1109,
+            "min_ns": 1086,
+            "mode": "reqthreads-overcommit",
+            "p95_ns": 1129,
+            "p99_ns": 1166,
+            "priority": 2147489024,
+            "request_count": 1,
+            "requested_features": 0,
+            "return_sum": 256,
+            "sample_errors": 0,
+            "samples": 256,
+            "settle_ms": 50,
+            "stddev_ns": 171,
+            "warmup": 32
+          },
+          "kind": "zig-bench",
+          "meta": {
+            "binary": "twq-bench-syscall",
+            "component": "zig",
+            "kernel_bootfile": "/boot/TWQDEBUG/kernel",
+            "kernel_ident": "TWQDEBUG",
+            "kernel_osrelease": "15.0-STABLE"
+          },
+          "status": "ok"
+        },
+        "should_narrow": {
+          "data": {
+            "benchmark": "syscall-hotpath",
+            "bool_false_count": 1024,
+            "bool_true_count": 0,
+            "counter_delta": {
+              "init_count": 0,
+              "reqthreads_count": 0,
+              "thread_enter_count": 0,
+              "thread_return_count": 0,
+              "thread_transfer_count": 0
+            },
+            "init_features": 19,
+            "last_error": 0,
+            "max_ns": 13659,
+            "mean_ns": 1034,
+            "median_ns": 1019,
+            "min_ns": 992,
+            "mode": "should-narrow",
+            "p95_ns": 1036,
+            "p99_ns": 1079,
+            "priority": 5376,
+            "request_count": 1,
+            "requested_features": 0,
+            "return_sum": 0,
+            "sample_errors": 0,
+            "samples": 1024,
+            "settle_ms": 50,
+            "stddev_ns": 402,
+            "warmup": 128
+          },
+          "kind": "zig-bench",
+          "meta": {
+            "binary": "twq-bench-syscall",
+            "component": "zig",
+            "kernel_bootfile": "/boot/TWQDEBUG/kernel",
+            "kernel_ident": "TWQDEBUG",
+            "kernel_osrelease": "15.0-STABLE"
+          },
+          "status": "ok"
+        },
+        "thread_enter": {
+          "data": {
+            "benchmark": "syscall-hotpath",
+            "bool_false_count": 0,
+            "bool_true_count": 0,
+            "counter_delta": {
+              "init_count": 0,
+              "reqthreads_count": 0,
+              "thread_enter_count": 256,
+              "thread_return_count": 256,
+              "thread_transfer_count": 0
+            },
+            "init_features": 19,
+            "last_error": 0,
+            "max_ns": 3535,
+            "mean_ns": 993,
+            "median_ns": 979,
+            "min_ns": 965,
+            "mode": "thread-enter",
+            "p95_ns": 1033,
+            "p99_ns": 1046,
+            "priority": 5376,
+            "request_count": 1,
+            "requested_features": 0,
+            "return_sum": 0,
+            "sample_errors": 0,
+            "samples": 256,
+            "settle_ms": 50,
+            "stddev_ns": 160,
+            "warmup": 32
+          },
+          "kind": "zig-bench",
+          "meta": {
+            "binary": "twq-bench-syscall",
+            "component": "zig",
+            "kernel_bootfile": "/boot/TWQDEBUG/kernel",
+            "kernel_ident": "TWQDEBUG",
+            "kernel_osrelease": "15.0-STABLE"
+          },
+          "status": "ok"
+        },
+        "thread_return": {
+          "data": {
+            "benchmark": "syscall-hotpath",
+            "bool_false_count": 0,
+            "bool_true_count": 0,
+            "counter_delta": {
+              "init_count": 0,
+              "reqthreads_count": 0,
+              "thread_enter_count": 256,
+              "thread_return_count": 256,
+              "thread_transfer_count": 0
+            },
+            "init_features": 19,
+            "last_error": 0,
+            "max_ns": 1764,
+            "mean_ns": 985,
+            "median_ns": 976,
+            "min_ns": 962,
+            "mode": "thread-return",
+            "p95_ns": 1026,
+            "p99_ns": 1053,
+            "priority": 5376,
+            "request_count": 1,
+            "requested_features": 0,
+            "return_sum": 0,
+            "sample_errors": 0,
+            "samples": 256,
+            "settle_ms": 50,
+            "stddev_ns": 58,
+            "warmup": 32
+          },
+          "kind": "zig-bench",
+          "meta": {
+            "binary": "twq-bench-syscall",
+            "component": "zig",
+            "kernel_bootfile": "/boot/TWQDEBUG/kernel",
+            "kernel_ident": "TWQDEBUG",
+            "kernel_osrelease": "15.0-STABLE"
+          },
+          "status": "ok"
+        },
+        "thread_transfer": {
+          "data": {
+            "benchmark": "syscall-hotpath",
+            "bool_false_count": 0,
+            "bool_true_count": 0,
+            "counter_delta": {
+              "init_count": 0,
+              "reqthreads_count": 0,
+              "thread_enter_count": 256,
+              "thread_return_count": 256,
+              "thread_transfer_count": 256
+            },
+            "init_features": 19,
+            "last_error": 0,
+            "max_ns": 2302,
+            "mean_ns": 1226,
+            "median_ns": 1219,
+            "min_ns": 1186,
+            "mode": "thread-transfer",
+            "p95_ns": 1253,
+            "p99_ns": 1286,
+            "priority": 5376,
+            "request_count": 1,
+            "requested_features": 0,
+            "return_sum": 0,
+            "sample_errors": 0,
+            "samples": 256,
+            "settle_ms": 50,
+            "stddev_ns": 70,
+            "warmup": 32
+          },
+          "kind": "zig-bench",
+          "meta": {
+            "binary": "twq-bench-syscall",
+            "component": "zig",
+            "kernel_bootfile": "/boot/TWQDEBUG/kernel",
+            "kernel_ident": "TWQDEBUG",
+            "kernel_osrelease": "15.0-STABLE"
+          },
+          "status": "ok"
+        }
+      },
+      "label": "m13-lowlevel-suite-zig-hotpath",
+      "schema_version": 1,
+      "serial_log": "/Users/me/wip-gcd-tbb-fx/wip-codex54x/../artifacts/benchmarks/m13-lowlevel-suite-20260416T101547Z/m13-lowlevel.serial.log"
+    }
+  }
+}

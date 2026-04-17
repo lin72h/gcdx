@@ -14,6 +14,24 @@ private func c_sysctlbyname(
   _ newlen: Int
 ) -> CInt
 
+private typealias DispatchTwqCounterEmitSnapshotFn = @convention(c) (
+  UnsafePointer<CChar>,
+  UnsafePointer<CChar>,
+  UnsafePointer<CChar>,
+  UInt64,
+  UInt64
+) -> Void
+
+private let dispatchTwqCounterEmitSnapshotFn: DispatchTwqCounterEmitSnapshotFn? = {
+  guard let handle = dlopen(nil, Int32(RTLD_NOW)) else {
+    return nil
+  }
+  guard let symbol = dlsym(handle, "_dispatch_twq_counter_emit_snapshot") else {
+    return nil
+  }
+  return unsafeBitCast(symbol, to: DispatchTwqCounterEmitSnapshotFn.self)
+}()
+
 private struct TwqRoundCounters {
   let reqthreadsCount: UInt64
   let threadEnterCount: UInt64
@@ -134,6 +152,31 @@ private func emitRoundCounters(
       "progress",
       "\"mode\":\"\(mode)\",\"phase\":\"\(phase)\",\"round\":\(round),\"completed_rounds\":\(completedRounds),\"sysctl_error\":\(error)"
     )
+  }
+}
+
+private func emitLibdispatchRoundSnapshot(
+  domain: String,
+  mode: String,
+  phase: String,
+  round: Int,
+  completedRounds: Int
+) {
+  guard let emitSnapshot = dispatchTwqCounterEmitSnapshotFn else {
+    return
+  }
+  domain.withCString { domainCStr in
+    mode.withCString { modeCStr in
+      phase.withCString { phaseCStr in
+        emitSnapshot(
+          domainCStr,
+          modeCStr,
+          phaseCStr,
+          UInt64(round),
+          UInt64(completedRounds)
+        )
+      }
+    }
   }
 }
 
@@ -279,6 +322,13 @@ struct Main {
             counters: roundStartDispatchCounters
           )
         }
+        emitLibdispatchRoundSnapshot(
+          domain: "swift",
+          mode: "dispatchmain-taskhandles-after-repeat",
+          phase: "round-start-counters",
+          round: round,
+          completedRounds: completedRounds
+        )
 
         let handles = (0..<tasks).map { i in
           Task<Int, Never> {
@@ -357,6 +407,13 @@ struct Main {
             )
           }
         }
+        emitLibdispatchRoundSnapshot(
+          domain: "swift",
+          mode: "dispatchmain-taskhandles-after-repeat",
+          phase: "round-ok-counters",
+          round: round,
+          completedRounds: completedRounds
+        )
       }
 
       emit(
