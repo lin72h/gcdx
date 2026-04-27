@@ -14,6 +14,7 @@ defmodule TwqTest.PressureProviderObserverTest do
     payload = PressureProviderObserver.load(@baseline)
 
     assert payload["observer_kind"] == "pressure_observer_v1"
+    assert payload["source_session_kind"] == "callable_session_v1"
     assert payload["source_view_kind"] == "aggregate_view_v1"
     assert get_in(payload, ["contract", "current_signal_field"]) == "nonidle_workers_current"
   end
@@ -25,11 +26,11 @@ defmodule TwqTest.PressureProviderObserverTest do
     assert comparison.failures == []
   end
 
-  test "fails when the observer source view version drifts" do
+  test "fails when the observer source session version drifts" do
     candidate =
       @baseline
       |> PressureProviderObserver.load()
-      |> put_in(["captures", "dispatch.pressure", "source_view_version"], 0)
+      |> put_in(["captures", "dispatch.pressure", "source_session_version"], 0)
 
     comparison = PressureProviderObserver.compare(@baseline, candidate)
 
@@ -37,7 +38,7 @@ defmodule TwqTest.PressureProviderObserverTest do
 
     assert Enum.any?(
              comparison.failures,
-             &String.contains?(&1, "source_view_version differs")
+             &String.contains?(&1, "source_session_version differs")
            )
   end
 end

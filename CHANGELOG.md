@@ -2,6 +2,294 @@
 
 ## 2026-04-17
 
+### Second-round TBBX/TCM review and N0 GCD-only baseline lane
+
+The second strategic review did not move the provider boundary. It added
+deployment and lifecycle details that now shape the first integration proof.
+
+What changed:
+
+1. [m15-tbbx-tcm-pressure-provider-coordination.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/m15-tbbx-tcm-pressure-provider-coordination.md)
+   now documents the adapter-side lifecycle details from the second review:
+   TCM disabled/load-order handling, zero-demand `tcmDeactivatePermit`,
+   rigid `min == max == demand` reserve requests, no smoothing for the first
+   raw experiment, and wrapping-safe handling for future `uint32_t`
+   cumulative SPI counters;
+2. [pthread_workqueue_pressure_snapshot_np.h](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/pthread_workqueue_pressure_snapshot_np.h),
+   [pthread_workqueue_pressure_snapshot_np.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/pthread_workqueue_pressure_snapshot_np.c),
+   [tbbx_twq_bridge_demand.h](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/tbbx_twq_bridge_demand.h),
+   [tbbx_twq_bridge_demand.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/tbbx_twq_bridge_demand.c),
+   and
+   [pthread_workqueue_pressure_snapshot_np_probe.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/pthread_workqueue_pressure_snapshot_np_probe.c)
+   now make the candidate compact snapshot and TBBX reserve-demand projection
+   compile-testable without installing a real libthr SPI;
+3. [run-m15-tbbx-n0-gcd-only-baseline.sh](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/run-m15-tbbx-n0-gcd-only-baseline.sh)
+   now provides a GCD-only `N0` wrapper around the existing pressure-provider
+   bundle smoke lane;
+4. [m15-tbbx-n0-gcd-only-baseline.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/m15-tbbx-n0-gcd-only-baseline.md)
+   records that `N0/A.0` is a baseline artifact lane only: GCD active,
+   oneTBB absent, TCM absent, and no pressure SPI claim;
+5. [roadmap.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/roadmap.md)
+   now includes `N0` before the mixed-runtime `N3` comparison.
+
+What this work decided:
+
+1. do not smooth reserve demand before the first mixed-runtime proof; measure
+   raw behavior first;
+2. do not size reserve demand from cumulative backlog counters;
+3. do not add origin tagging or double-counting machinery to v1;
+4. use the existing bundle lane as the GCD-only pressure artifact until a real
+   private SPI is justified.
+
+### TBBX/TCM strategy review folded into the provider boundary
+
+The open-TCM source review now has a concrete GCDX-side strategy update:
+the current layering is retained, but the first reserve-permit experiment is
+explicitly an adapter built on public TCM APIs, not a TCM source change and
+not a TWQ/libthr dependency.
+
+What changed:
+
+1. [m15-tbbx-tcm-pressure-provider-coordination.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/m15-tbbx-tcm-pressure-provider-coordination.md)
+   now records the source-review rationale for keeping TCM above the provider
+   line: TCM is process-local user-space policy, its grant engine is
+   permit-driven, and platform facts should constrain policy rather than move
+   policy into TWQ;
+2. the same note now records the minimal future
+   `__pthread_workqueue_pressure_snapshot_np` shape separately from the
+   repo-local `twq_pressure_provider_*` preview artifacts;
+3. the synthetic reserve permit is now specified as a TBBX adapter action
+   through `tcmConnect` and `tcmRequestPermit`, with demand derived from
+   `nonidle_workers_current` and capped by TCM platform concurrency;
+4. the trigger-latency limitation is documented: polling-driven updates are
+   acceptable for v1, while any v2 notification must remain one-way from
+   TWQ pressure generation change to adapter wakeup;
+5. [roadmap.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/roadmap.md)
+   now reframes `M15` as a TBBX/TCM integration proof rather than vague deep
+   scheduler integration.
+
+What this work decided:
+
+1. do not freeze a private libthr pressure SPI until mixed GCD plus oneTBB
+   data proves the bridge improves over TCM-only behavior;
+2. run the next integration sequence as `N1` open-TCM FreeBSD build, `N2`
+   oneTBB adaptor load, `N3` mixed-workload baseline, then `N4` pressure SPI
+   only if needed;
+3. keep `pressure_state`, `consumed_capacity_1024`, TCM permit counts, grant
+   state, and callbacks above the provider line.
+
+### TBBX/TCM pressure-provider coordination and bundle lane
+
+The TBBX open TCM update now has a concrete GCDX-side coordination answer:
+TCM remains user-space policy above the provider line, while GCDX exposes
+aggregate pressure facts without TCM headers, permits, or callbacks.
+
+What changed:
+
+1. [m15-tbbx-tcm-pressure-provider-coordination.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/m15-tbbx-tcm-pressure-provider-coordination.md)
+   records the GCDX-side review of the TBBX PlanC pressure snapshot ABI,
+   synthetic reserve permit idea, and no-TCM-dependency rule below the
+   provider line;
+2. [twq_pressure_provider_bundle.h](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_bundle.h),
+   [twq_pressure_provider_bundle.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_bundle.c),
+   and
+   [twq_pressure_provider_bundle_probe.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_bundle_probe.c)
+   now define a callable bundle that polls the session once and updates
+   observer and tracker summaries from the same aggregate view;
+3. [extract-m15-pressure-provider-bundle.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/extract-m15-pressure-provider-bundle.py),
+   [extract-m15-pressure-provider-bundle-replay.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/extract-m15-pressure-provider-bundle-replay.py),
+   [compare-m15-pressure-provider-bundle-smoke.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/compare-m15-pressure-provider-bundle-smoke.py),
+   [run-m15-pressure-provider-bundle-smoke.sh](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/run-m15-pressure-provider-bundle-smoke.sh),
+   and
+   [run-m15-pressure-provider-bundle-replay.sh](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/run-m15-pressure-provider-bundle-replay.sh)
+   now provide smoke and host replay lanes for the bundle family;
+4. the checked-in bundle baseline now lives at
+   [m15-pressure-provider-bundle-smoke-20260417.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m15-pressure-provider-bundle-smoke-20260417.json);
+5. the shared contract, contract check, ExUnit helpers, and top-level stack
+   gate now include the bundle family.
+
+What this work proved:
+
+1. the TBBX synthetic reserve permit can be fed by a GCDX-owned pressure
+   projection without moving TCM vocabulary into TWQ or `pthread_workqueue`;
+2. the session artifact is sufficient to reconstruct the combined
+   observer/tracker bundle summary offline;
+3. the pressure-provider stack now has a callable aggregate polling artifact
+   suitable for early TBBX coordination while still staying below any real SPI
+   claim.
+
+### Pressure-provider tracker is now part of the repo-owned stack
+
+The pressure-only boundary now has a tracker family above callable session,
+and that family is no longer a side artifact outside the main stack gate.
+
+What changed:
+
+1. [twq_pressure_provider_tracker.h](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_tracker.h),
+   [twq_pressure_provider_tracker.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_tracker.c),
+   and
+   [twq_pressure_provider_tracker_probe.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_tracker_probe.c)
+   now define and emit a versioned transition-tracker summary above callable
+   session v1;
+2. [extract-m15-pressure-provider-tracker.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/extract-m15-pressure-provider-tracker.py),
+   [extract-m15-pressure-provider-tracker-replay.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/extract-m15-pressure-provider-tracker-replay.py),
+   [compare-m15-pressure-provider-tracker-smoke.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/compare-m15-pressure-provider-tracker-smoke.py),
+   [run-m15-pressure-provider-tracker-smoke.sh](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/run-m15-pressure-provider-tracker-smoke.sh),
+   and
+   [run-m15-pressure-provider-tracker-replay.sh](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/run-m15-pressure-provider-tracker-replay.sh)
+   now provide fresh guest smoke and host replay lanes for the tracker family;
+3. the checked-in tracker baseline now lives at
+   [m15-pressure-provider-tracker-smoke-20260417.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m15-pressure-provider-tracker-smoke-20260417.json);
+4. [m15-pressure-provider-contract-v1.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/contracts/m15-pressure-provider-contract-v1.json),
+   [validate-m15-pressure-provider-contract.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/validate-m15-pressure-provider-contract.py),
+   [run-m15-pressure-provider-contract-check.sh](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/run-m15-pressure-provider-contract-check.sh),
+   and
+   [pressure_provider_contract.ex](/Users/me/wip-gcd-tbb-fx/wip-codex54x/elixir/lib/twq_test/pressure_provider_contract.ex)
+   now validate tracker as part of the shared pressure-only contract;
+5. [run-m15-pressure-provider-stack-gate.sh](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/run-m15-pressure-provider-stack-gate.sh)
+   now composes tracker smoke and tracker replay into the top-level readiness
+   verdict instead of leaving tracker outside the stack.
+
+What this work proved:
+
+1. the callable session artifact is sufficient for a second consumer-side
+   summary family, not just the observer summary;
+2. the tracker family now sits inside the same contract and stack-gate story as
+   the rest of the pressure-only boundary;
+3. the repo can now prove tracker sufficiency both from a fresh guest run and
+   from host replay against the checked-in session artifact.
+
+### Pressure-provider stack gate is now repo-owned
+
+The pressure-only boundary is no longer just a growing set of child lanes. The
+repo now has one top-level stack gate that composes them into a single
+machine-readable verdict.
+
+What changed:
+
+1. [run-m15-pressure-provider-stack-gate.sh](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/run-m15-pressure-provider-stack-gate.sh)
+   now composes the derived prep, live smoke, preview smoke, adapter smoke,
+   session smoke, observer smoke, observer replay, and contract-check lanes;
+2. [m15-pressure-provider-stack-gate.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/m15-pressure-provider-stack-gate.md)
+   now records the top-level boundary and exit rule explicitly;
+3. [vm.ex](/Users/me/wip-gcd-tbb-fx/wip-codex54x/elixir/lib/twq_test/vm.ex)
+   now exposes the same lane through
+   `TwqTest.VM.run_m15_pressure_provider_stack_gate/1`;
+4. [vm_m15_pressure_provider_stack_gate_test.exs](/Users/me/wip-gcd-tbb-fx/wip-codex54x/elixir/test/twq_test/vm_m15_pressure_provider_stack_gate_test.exs)
+   now proves the stack gate in reuse mode against the checked-in artifacts.
+
+What this work proved:
+
+1. the current pressure-only stack can now be checked as one composed unit
+   instead of only through separate child lanes;
+2. the checked-in contract can now be applied to the actual artifact paths
+   chosen by the top-level gate, not just to isolated baseline checks;
+3. the boundary story is now legible at the repo level without claiming a real
+   provider SPI.
+
+### Pressure-provider contract now covers the observer family too
+
+The machine-readable contract is no longer limited to the lower layers.
+
+What changed:
+
+1. [m15-pressure-provider-contract-v1.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/contracts/m15-pressure-provider-contract-v1.json)
+   and
+   [validate-m15-pressure-provider-contract.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/validate-m15-pressure-provider-contract.py)
+   now model and validate the observer family explicitly;
+2. [run-m15-pressure-provider-contract-check.sh](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/run-m15-pressure-provider-contract-check.sh)
+   now validates derived, live, adapter, session, observer, and preview
+   together;
+3. [m15-pressure-provider-contract.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/m15-pressure-provider-contract.md)
+   now describes the observer family and its session provenance explicitly;
+4. [pressure_provider_contract_test.exs](/Users/me/wip-gcd-tbb-fx/wip-codex54x/elixir/test/twq_test/pressure_provider_contract_test.exs)
+   now includes observer-positive and observer-negative contract tests.
+
+What this work proved:
+
+1. the observer summary is now part of the same frozen pressure-only contract
+   as the lower artifact families;
+2. the contract-check lane stays honest by validating observer provenance
+   instead of assuming it from docs alone.
+
+### Observer is now session-backed and replayable
+
+The observer lane no longer bypasses the callable session surface, and the repo
+now has a host-side replay lane that rebuilds observer summaries from the
+checked-in session artifact.
+
+What changed:
+
+1. [twq_pressure_provider_observer.h](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_observer.h)
+   and
+   [twq_pressure_provider_observer.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_observer.c)
+   now record source-session provenance and expose
+   `twq_pressure_provider_observer_poll_session_v1()`;
+2. [twq_pressure_provider_observer_probe.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_observer_probe.c)
+   now builds observer summaries through the callable session surface instead
+   of reading raw snapshot state directly;
+3. [extract-m15-pressure-provider-observer.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/extract-m15-pressure-provider-observer.py)
+   and
+   [compare-m15-pressure-provider-observer-smoke.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/compare-m15-pressure-provider-observer-smoke.py)
+   now stamp and compare explicit `source_session_kind`,
+   `source_session_version`, and `source_session_struct_size` fields;
+4. the checked-in observer baseline at
+   [m15-pressure-provider-observer-smoke-20260417.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m15-pressure-provider-observer-smoke-20260417.json)
+   was refreshed from a fresh guest run against the new session-backed probe;
+5. [extract-m15-pressure-provider-observer-replay.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/extract-m15-pressure-provider-observer-replay.py)
+   and
+   [run-m15-pressure-provider-observer-replay.sh](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/run-m15-pressure-provider-observer-replay.sh)
+   now provide the repo-owned host replay lane above the session artifact;
+6. [m15-pressure-provider-observer-replay.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/m15-pressure-provider-observer-replay.md)
+   now records the replay boundary explicitly, and the lane is visible to
+   ExUnit through `TwqTest.VM.run_m15_pressure_provider_observer_replay/1`.
+
+What this work proved:
+
+1. the observer summary can now sit honestly above the callable session
+   surface instead of bypassing it;
+2. a fresh guest observer run still passes after that layering change;
+3. the checked-in session artifact can reproduce the checked-in observer
+   baseline through the new host replay lane with `verdict=ok`.
+
+### Callable session pressure-provider smoke is now repo-owned and contract-checked
+
+The pressure-only boundary now has a fifth repo-owned artifact family: a
+callable session surface above the aggregate adapter view and below any real
+provider SPI or ABI claim.
+
+What changed:
+
+1. [twq_pressure_provider_session.h](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_session.h),
+   [twq_pressure_provider_session.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_session.c),
+   and
+   [twq_pressure_provider_session_probe.c](/Users/me/wip-gcd-tbb-fx/wip-codex54x/csrc/twq_pressure_provider_session_probe.c)
+   now define and emit a versioned callable session surface that owns the base
+   snapshot and generation sequencing while returning the aggregate-only
+   pressure view;
+2. [extract-m15-pressure-provider-session.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/extract-m15-pressure-provider-session.py),
+   [compare-m15-pressure-provider-session-smoke.py](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/compare-m15-pressure-provider-session-smoke.py),
+   and
+   [run-m15-pressure-provider-session-smoke.sh](/Users/me/wip-gcd-tbb-fx/wip-codex54x/scripts/benchmarks/run-m15-pressure-provider-session-smoke.sh)
+   now provide the repo-owned session smoke lane;
+3. the first checked-in session baseline now lives at
+   [m15-pressure-provider-session-smoke-20260417.json](/Users/me/wip-gcd-tbb-fx/wip-codex54x/benchmarks/baselines/m15-pressure-provider-session-smoke-20260417.json);
+4. the machine-readable contract and contract-check lane now cover the
+   derived, live, adapter, session, and preview families instead of only the
+   earlier four;
+5. [m15-pressure-provider-session-smoke.md](/Users/me/wip-gcd-tbb-fx/wip-codex54x/m15-pressure-provider-session-smoke.md)
+   now records the session boundary explicitly, and the lane is visible to
+   ExUnit through `TwqTest.PressureProviderSession` and
+   `TwqTest.VM.run_m15_pressure_provider_session_smoke/1`.
+
+What this work proved:
+
+1. a fresh guest bootstrap run produced a stable callable session artifact for
+   both `dispatch.pressure` and `dispatch.sustained`;
+2. the checked-in session baseline self-compares cleanly with `verdict=ok`;
+3. the shared contract lane now validates all five current artifact families
+   with `verdict=ok`.
+
 ### Pressure observer smoke is now repo-owned above the aggregate adapter view
 
 The pressure-only boundary now has a first consumer-side proof lane: a

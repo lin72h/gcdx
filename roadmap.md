@@ -32,6 +32,31 @@ This roadmap is guided by the current project intent:
 
 ## Current State
 
+- `done` pressure-only provider prep now includes a repo-owned transition
+  tracker family above the callable session surface, with both a fresh guest
+  smoke lane and a host replay lane from the checked-in session artifact
+- `done` the top-level pressure stack gate now includes tracker smoke and
+  tracker replay, so the current pressure-only stack is composed and checked as
+  one readiness surface instead of leaving tracker as a side lane
+- `done` the TBBX open TCM PlanC update has a GCDX-side coordination note:
+  TCM remains user-space policy above the provider line, and the GCDX pressure
+  provider stays aggregate, pressure-only, and free of permit vocabulary
+- `done` the TBBX/TCM coordination note now incorporates the open-TCM source
+  review: the first reserve-permit experiment should use public TCM APIs from
+  a TBBX-owned adapter, not changes inside TCM or any callback path into TWQ
+- `done` the second-round TBBX/TCM review has been folded into the same
+  boundary: TCM disabled/load-order handling, zero-demand deactivation,
+  wrapping `uint32_t` SPI counters, sidecar adapter placement, and raw
+  no-smoothing reserve behavior are now documented
+- `done` pressure-only provider prep now includes a callable bundle family
+  that polls session once and updates observer plus tracker from the same
+  aggregate view, with smoke and replay lanes inside the stack gate
+- `done` `N0` now has a GCD-only baseline wrapper that reuses the validated
+  pressure-provider bundle lane instead of adding another provider surface
+- `done` the candidate compact private-SPI struct and TBBX demand projection
+  helper now compile locally under `csrc/`, but they remain handoff artifacts
+  rather than installed libthr ABI
+
 - `done` Git repo initialized in this directory
 - `done` main implementation plan exists
 - `done` testing strategy exists
@@ -292,8 +317,8 @@ This roadmap is guided by the current project intent:
   `active_workers_current` only as supporting detail
 - `done` the pressure-only provider boundary is now also machine-readable
   through `benchmarks/contracts/m15-pressure-provider-contract-v1.json`, with
-  repo-owned contract validation for the derived, live, adapter, and preview
-  artifact families
+  repo-owned contract validation for the derived, live, adapter, session, and
+  preview artifact families
 - `done` an aggregate adapter smoke lane now exists through
   `scripts/benchmarks/run-m15-pressure-provider-adapter-smoke.sh`, with a
   checked-in aggregate adapter baseline at
@@ -310,6 +335,13 @@ This roadmap is guided by the current project intent:
   `m15-pressure-provider-observer-smoke.md` and visible to ExUnit through
   `TwqTest.PressureProviderObserver` plus
   `TwqTest.VM.run_m15_pressure_provider_observer_smoke/1`
+- `done` the observer lane is now session-backed rather than bypassing the
+  callable session surface, and the refreshed observer baseline records that
+  provenance explicitly
+- `done` a host-side observer replay lane now exists through
+  `scripts/benchmarks/run-m15-pressure-provider-observer-replay.sh`, proving
+  the checked-in session artifact can reproduce the checked-in observer
+  baseline without a guest boot
 - `done` a raw preview smoke lane now exists through
   `scripts/benchmarks/run-m15-pressure-provider-preview-smoke.sh`, with a
   checked-in raw snapshot baseline at
@@ -318,6 +350,38 @@ This roadmap is guided by the current project intent:
   `m15-pressure-provider-preview-smoke.md` and visible to ExUnit through
   `TwqTest.PressureProviderPreview` plus
   `TwqTest.VM.run_m15_pressure_provider_preview_smoke/1`
+- `done` a callable session smoke lane now exists through
+  `scripts/benchmarks/run-m15-pressure-provider-session-smoke.sh`, with a
+  checked-in session baseline at
+  `benchmarks/baselines/m15-pressure-provider-session-smoke-20260417.json`
+- `done` the session boundary is now explicit in
+  `m15-pressure-provider-session-smoke.md` and visible to ExUnit through
+  `TwqTest.PressureProviderSession` plus
+  `TwqTest.VM.run_m15_pressure_provider_session_smoke/1`
+- `done` the TBBX/TCM pressure-provider coordination boundary is now explicit
+  in `m15-tbbx-tcm-pressure-provider-coordination.md`: GCDX owns aggregate
+  pressure facts below the provider line, while TBBX/TCM owns any synthetic
+  reserve permit projection above it
+- `done` a callable bundle smoke lane now exists through
+  `scripts/benchmarks/run-m15-pressure-provider-bundle-smoke.sh`, with a
+  checked-in bundle baseline at
+  `benchmarks/baselines/m15-pressure-provider-bundle-smoke-20260417.json`
+- `done` the bundle boundary is now explicit in
+  `m15-pressure-provider-bundle-smoke.md` and visible to ExUnit through
+  `TwqTest.PressureProviderBundle` plus
+  `TwqTest.VM.run_m15_pressure_provider_bundle_smoke/1`
+- `done` a host-side bundle replay lane now exists through
+  `scripts/benchmarks/run-m15-pressure-provider-bundle-replay.sh`, proving
+  the checked-in session artifact can reproduce the checked-in bundle baseline
+  without a guest boot
+- `done` the GCD-only `N0` baseline wrapper now exists through
+  `scripts/benchmarks/run-m15-tbbx-n0-gcd-only-baseline.sh`; it captures
+  `dispatch.pressure` and `dispatch.sustained` through the existing bundle
+  lane as condition `A.0` for future mixed GCD + oneTBB comparison
+- `done` `csrc/pthread_workqueue_pressure_snapshot_np.*` and
+  `csrc/tbbx_twq_bridge_demand.*` now make the compact snapshot candidate and
+  reserve-demand projection compile-testable without making them part of
+  libthr yet
 
 ## Current Gap Versus Native macOS
 
@@ -398,8 +462,8 @@ Working interpretation:
 | M12 | done | Swift delayed-resume correctness closure | Kernel lane-split accounting closes the staged delayed-child Swift boundary and the full staged Swift profile now completes |
 | M13 | done | Performance and regression discipline | Benchmarks, DTrace tooling, safe counters, and comparison-ready baselines |
 | M14 | done | Canonical macOS comparison lane | Structured FreeBSD-vs-macOS comparison now shows the repeat-lane handoff seam is close enough to native macOS to stop tuning it |
-| M14.5 | done | Pressure-provider prep lanes | Derived, live-smoke, adapter-smoke, observer-smoke, and raw-preview pressure-only prep surfaces now exist without claiming a live SPI |
-| M15 | later | Optional deep integration | Scheduler refinement and possible kevent/workloop decisions |
+| M14.5 | done | Pressure-provider prep lanes | Derived, live, preview, adapter, session, observer, tracker, and bundle pressure-only prep surfaces now exist without claiming a live SPI |
+| M15 | planned | TBBX/TCM integration proof | Build open TCM on FreeBSD, measure TCM-only mixed workloads, and freeze a private pressure SPI only if the bridge proves necessary |
 
 ## Milestone Details
 
@@ -1721,7 +1785,7 @@ Completed outcomes:
     `active_workers_current` only as supporting detail for continuity;
 12. the machine-readable contract for that boundary now lives at
     `benchmarks/contracts/m15-pressure-provider-contract-v1.json` and is
-    checked against the derived, live, adapter, and preview baselines via a
+    checked against the derived, live, adapter, session, and preview baselines via a
     repo-owned contract-validation lane;
 13. `twq_pressure_provider_adapter.h`,
     `twq_pressure_provider_adapter.c`, and
@@ -1763,7 +1827,56 @@ Completed outcomes:
 22. the raw preview boundary is now recorded in
     `m15-pressure-provider-preview-smoke.md` and visible through
     `TwqTest.PressureProviderPreview` plus
-    `TwqTest.VM.run_m15_pressure_provider_preview_smoke/1`.
+    `TwqTest.VM.run_m15_pressure_provider_preview_smoke/1`;
+23. `csrc/twq_pressure_provider_session.h`,
+    `csrc/twq_pressure_provider_session.c`, and
+    `csrc/twq_pressure_provider_session_probe.c` now define a callable
+    session surface that owns the base snapshot and generation sequence while
+    returning the aggregate-only pressure view;
+24. `extract-m15-pressure-provider-session.py`,
+    `compare-m15-pressure-provider-session-smoke.py`, and
+    `run-m15-pressure-provider-session-smoke.sh` now provide the repo-owned
+    session smoke lane, with the first checked-in baseline at
+    `benchmarks/baselines/m15-pressure-provider-session-smoke-20260417.json`;
+25. the session boundary is now recorded in
+    `m15-pressure-provider-session-smoke.md` and visible through
+    `TwqTest.PressureProviderSession` plus
+    `TwqTest.VM.run_m15_pressure_provider_session_smoke/1`;
+26. the observer probe now builds its summaries through the callable session
+    surface instead of reading lower-level snapshot state directly, and the
+    refreshed baseline records `source_session_kind`,
+    `source_session_version`, and `source_session_struct_size` explicitly;
+27. `extract-m15-pressure-provider-observer-replay.py` and
+    `run-m15-pressure-provider-observer-replay.sh` now provide the repo-owned
+    replay lane that derives observer summaries from the checked-in session
+    artifact without booting a guest again.
+28. the machine-readable contract and contract-check lane now cover the
+    observer family too, so derived, live, adapter, session, observer, and
+    preview all conform to one checked-in pressure-only contract;
+29. `run-m15-pressure-provider-stack-gate.sh` now composes the whole current
+    pressure stack into one repo-owned verdict above the child lanes, and the
+    same gate is visible through
+    `TwqTest.VM.run_m15_pressure_provider_stack_gate/1`.
+30. `m15-tbbx-tcm-pressure-provider-coordination.md` now records the
+    TBBX/TCM PlanC boundary: TCM may translate GCDX pressure into a private
+    synthetic reserve permit above the provider line, but GCDX/TWQ stays
+    TCM-blind below it.
+31. `twq_pressure_provider_bundle.{h,c}` and
+    `twq_pressure_provider_bundle_probe.c` now define a callable bundle preview
+    that polls session once and updates observer plus tracker from the same
+    view.
+32. `extract-m15-pressure-provider-bundle*.py`,
+    `compare-m15-pressure-provider-bundle-smoke.py`, and
+    `run-m15-pressure-provider-bundle-*.sh` now provide guest smoke and
+    host replay lanes for the bundle family, and the stack gate includes both.
+33. the TBBX/TCM coordination note now records the source-review correction
+    that a v1 synthetic reserve permit can be implemented by a TBBX adapter
+    through public TCM APIs, with no TCM source change and no dependency below
+    the provider line.
+34. the same note records the trigger-latency limitation of polling-driven
+    reserve updates and keeps any event-assisted notification one-way:
+    pressure generation changes may wake the adapter, but TCM must not call
+    into TWQ.
 
 Exit criteria:
 
@@ -1775,12 +1888,24 @@ Exit criteria:
 4. the boundary remains pressure-only and still does not claim a live SPI;
 5. current-pressure quiescence is judged by total/non-idle worker return to
    zero, not by raw `active_workers_current` alone;
-6. the derived, live, adapter, and preview artifact families still conform to
-   the same checked-in pressure-provider contract;
+6. the derived, live, adapter, session, observer, tracker, bundle, and preview artifact
+   families still conform to the same checked-in pressure-provider contract;
 7. the observer lane stays above the aggregate adapter view and below any real
    consumer/runtime integration;
 8. the raw preview lane stays versioned, comparable, and explicitly below any
-   claimed private SPI preview.
+   claimed private SPI preview;
+9. the session lane stays callable and pressure-only while owning its own
+   generation sequence instead of silently becoming a real system SPI;
+10. the observer, tracker, and bundle replay lanes stay reproducible from the
+    checked-in session artifact, so consumer-side sufficiency can be checked
+    without another guest boot.
+11. the TBBX/TCM coordination rule stays intact: synthetic reserve permit
+    logic remains above the provider line, and no TCM vocabulary enters GCDX,
+    TWQ, or `pthread_workqueue`.
+12. the top-level stack gate stays green, so the boundary remains legible as
+    one composed surface instead of a disconnected list of child lanes.
+13. the private SPI remains unfrozen until mixed GCD plus oneTBB data proves
+    that a bridge improves over TCM-only behavior.
 
 Why it matters:
 
@@ -1799,35 +1924,72 @@ or claiming a real integration surface. The raw preview lane still proves that
 there is also a versioned struct-shaped snapshot boundary under those
 higher-level artifacts, which remains the last useful prep step before any
 actual SPI-preview discussion. The machine-readable contract then freezes that
-same boundary explicitly so future
-consumer work starts from one checked-in surface instead of from drift between
-docs, baselines, and comparators.
+same boundary explicitly so future consumer work starts from one checked-in
+surface instead of from drift between docs, baselines, and comparators. The
+new session lane then proves there is also a callable pressure-only surface
+that owns baseline snapshot state and generation sequencing without yet
+forcing any placement decision about a real private SPI. The observer refresh
+then proves that a consumer summary can honestly sit on top of that session
+surface, and the replay lane proves the session artifact itself is sufficient
+to reconstruct the observer summary offline. The observer contract extension
+then freezes that higher layer inside the same machine-readable boundary. The
+tracker and bundle lanes add transition and combined callable views above the
+same session artifact, which gives TBBX a practical aggregate polling artifact
+without leaking TCM concepts downward. The new stack gate turns the whole
+pressure-only ladder into one repo-owned readiness surface without promoting it
+into a real provider SPI.
 
-## M15: Optional Deep Integration
+## M15: TBBX/TCM Integration Proof
 
-Status: `later`
+Status: `planned`
 
 Goal:
 
-1. revisit features that were intentionally deferred;
-2. deepen integration only if it remains natural on FreeBSD.
+1. validate open TCM on FreeBSD before adding any lower-layer ABI;
+2. prove whether mixed GCD plus oneTBB workloads need a pressure bridge;
+3. freeze a private `pthread_workqueue` pressure snapshot SPI only if the
+   bridge shows measurable value over TCM-only behavior.
 
-Possible work:
+Planned sequence:
 
-1. scheduler refinement beyond the initial 6-bucket admission model;
-2. per-CPU or more nuanced accounting if profiling justifies it;
-3. reconsider direct kevent delivery if it becomes compelling;
-4. reconsider workloops only if they make sense technically and architecturally.
+1. `N1`: build open TCM on FreeBSD with hwloc2 and clean non-Linux handling;
+2. `N2`: verify oneTBB loads and uses open TCM through its normal adaptor;
+3. `N3`: run mixed GCD plus oneTBB workloads after first recording
+   single-runtime baselines:
+   GCD-only, oneTBB-only, TCM off mixed, TCM on mixed without bridge, and TCM
+   on mixed with a pressure-reserve bridge;
+4. `N4`: if `N3` proves the bridge is needed, freeze
+   `__pthread_workqueue_pressure_snapshot_np` and wire a TBBX-owned adapter
+   that creates a reserve permit through public TCM APIs.
+
+Boundary:
+
+1. TWQ and `pthread_workqueue` expose aggregate pressure facts only;
+2. TBBX/TCM owns synthetic reserve permit policy;
+3. `pressure_state`, `consumed_capacity_1024`, permit counts, grants, and
+   callbacks stay above the provider line;
+4. event-assisted notification, if needed later, is one-way from pressure
+   generation change to adapter wakeup.
 
 Exit criteria:
 
-1. there is a concrete benefit that the existing design cannot deliver cleanly;
-2. the additional complexity does not distort the FreeBSD kernel model.
+1. open TCM builds and runs on FreeBSD;
+2. oneTBB can use TCM through the upstream adaptor path;
+3. mixed-workload data distinguishes baseline, TCM-only, and bridge-enabled
+   behavior;
+4. if a private SPI is added, it is smaller than the preview bundle and
+   remains aggregate, pressure-only, and `struct_size` gated;
+5. no TCM headers, permits, callbacks, or policy enums enter TWQ, libthr
+   mechanism code, or GCDX mechanism code.
+6. `N0` GCD-only artifacts are preserved so mixed-runtime changes can be
+   compared against a known single-runtime TWQ pressure shape.
 
 Why it matters:
 
-This milestone exists to prevent premature complexity while still leaving room
-for a future cleaner system.
+This milestone decides whether the pressure bridge is necessary or merely an
+optimization. It also prevents the project from freezing a kernel/libthr ABI
+before proving that open TCM alone is insufficient for mixed-runtime
+oversubscription.
 
 ## Parallel Work Notes
 

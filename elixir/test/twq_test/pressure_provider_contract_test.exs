@@ -17,6 +17,22 @@ defmodule TwqTest.PressureProviderContractTest do
                       @repo_root,
                       "benchmarks/baselines/m15-pressure-provider-adapter-smoke-20260417.json"
                     )
+  @session_baseline Path.join(
+                      @repo_root,
+                      "benchmarks/baselines/m15-pressure-provider-session-smoke-20260417.json"
+                    )
+  @observer_baseline Path.join(
+                       @repo_root,
+                       "benchmarks/baselines/m15-pressure-provider-observer-smoke-20260417.json"
+                     )
+  @tracker_baseline Path.join(
+                      @repo_root,
+                      "benchmarks/baselines/m15-pressure-provider-tracker-smoke-20260417.json"
+                    )
+  @bundle_baseline Path.join(
+                     @repo_root,
+                     "benchmarks/baselines/m15-pressure-provider-bundle-smoke-20260417.json"
+                   )
   @preview_baseline Path.join(
                       @repo_root,
                       "benchmarks/baselines/m15-pressure-provider-preview-smoke-20260417.json"
@@ -52,8 +68,36 @@ defmodule TwqTest.PressureProviderContractTest do
     assert validation.failures == []
   end
 
+  test "accepts the checked-in session baseline against the contract" do
+    validation = PressureProviderContract.validate(@contract, @session_baseline, :session)
+
+    assert validation.ok?
+    assert validation.failures == []
+  end
+
   test "accepts the checked-in preview baseline against the contract" do
     validation = PressureProviderContract.validate(@contract, @preview_baseline, :preview)
+
+    assert validation.ok?
+    assert validation.failures == []
+  end
+
+  test "accepts the checked-in observer baseline against the contract" do
+    validation = PressureProviderContract.validate(@contract, @observer_baseline, :observer)
+
+    assert validation.ok?
+    assert validation.failures == []
+  end
+
+  test "accepts the checked-in tracker baseline against the contract" do
+    validation = PressureProviderContract.validate(@contract, @tracker_baseline, :tracker)
+
+    assert validation.ok?
+    assert validation.failures == []
+  end
+
+  test "accepts the checked-in bundle baseline against the contract" do
+    validation = PressureProviderContract.validate(@contract, @bundle_baseline, :bundle)
 
     assert validation.ok?
     assert validation.failures == []
@@ -139,6 +183,84 @@ defmodule TwqTest.PressureProviderContractTest do
     assert Enum.any?(
              validation.failures,
              &String.contains?(&1, "view field version missing")
+           )
+  end
+
+  test "fails when session metadata is missing" do
+    candidate =
+      @session_baseline
+      |> PressureProviderContract.load()
+      |> update_in(
+        ["captures", "dispatch.pressure", "snapshots"],
+        fn [first | rest] ->
+          [update_in(first, ["session"], &Map.delete(&1, "next_generation")) | rest]
+        end
+      )
+
+    validation = PressureProviderContract.validate(@contract, candidate, :session)
+
+    refute validation.ok?
+
+    assert Enum.any?(
+             validation.failures,
+             &String.contains?(&1, "session field next_generation missing")
+           )
+  end
+
+  test "fails when observer source-session metadata is missing" do
+    candidate =
+      @observer_baseline
+      |> PressureProviderContract.load()
+      |> update_in(["captures", "dispatch.pressure"], &Map.delete(&1, "source_session_version"))
+
+    validation = PressureProviderContract.validate(@contract, candidate, :observer)
+
+    refute validation.ok?
+
+    assert Enum.any?(
+             validation.failures,
+             &String.contains?(
+               &1,
+               "captures.dispatch.pressure: field source_session_version missing"
+             )
+           )
+  end
+
+  test "fails when tracker source-session metadata is missing" do
+    candidate =
+      @tracker_baseline
+      |> PressureProviderContract.load()
+      |> update_in(["captures", "dispatch.pressure"], &Map.delete(&1, "source_session_version"))
+
+    validation = PressureProviderContract.validate(@contract, candidate, :tracker)
+
+    refute validation.ok?
+
+    assert Enum.any?(
+             validation.failures,
+             &String.contains?(
+               &1,
+               "captures.dispatch.pressure: field source_session_version missing"
+             )
+           )
+  end
+
+  test "fails when bundle source-observer metadata is missing" do
+    candidate =
+      @bundle_baseline
+      |> PressureProviderContract.load()
+      |> update_in(["captures", "dispatch.pressure"], &Map.delete(&1, "source_observer_version"))
+
+    validation = PressureProviderContract.validate(@contract, candidate, :bundle)
+
+    refute validation.ok?
+
+    assert Enum.any?(
+             validation.failures,
+             &String.contains?(
+               &1,
+               "captures.dispatch.pressure: field source_observer_version missing"
+             )
            )
   end
 end

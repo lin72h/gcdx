@@ -8,9 +8,13 @@
 
 #define TWQ_PRESSURE_PROVIDER_OBSERVER_VERSION 1U
 
+struct twq_pressure_provider_session_v1;
+
 struct twq_pressure_provider_observer_v1 {
 	size_t struct_size;
 	uint32_t version;
+	size_t source_session_struct_size;
+	uint32_t source_session_version;
 	size_t source_view_struct_size;
 	uint32_t source_view_version;
 	uint64_t sample_count;
@@ -42,5 +46,8 @@ void twq_pressure_provider_observer_init_v1(
 int twq_pressure_provider_observer_update_v1(
     struct twq_pressure_provider_observer_v1 *observer,
     const struct twq_pressure_provider_view_v1 *view);
+int twq_pressure_provider_observer_poll_session_v1(
+    struct twq_pressure_provider_observer_v1 *observer,
+    struct twq_pressure_provider_session_v1 *session);
 
 #endif

@@ -56,6 +56,8 @@ def normalize_summary(record: dict) -> tuple[str | None, dict]:
         "duration_ms": data.get("duration_ms"),
         "struct_version": observer.get("version"),
         "struct_size": observer.get("struct_size"),
+        "source_session_version": observer.get("source_session_version"),
+        "source_session_struct_size": observer.get("source_session_struct_size"),
         "source_view_version": observer.get("source_view_version"),
         "source_view_struct_size": observer.get("source_view_struct_size"),
         "sample_count": observer.get("sample_count"),
@@ -100,6 +102,7 @@ def main() -> int:
         "provider_scope": "pressure_only",
         "contract": CONTRACT,
         "observer_kind": "pressure_observer_v1",
+        "source_session_kind": "callable_session_v1",
         "source_view_kind": "aggregate_view_v1",
         "metadata": {
             "label": args.label,

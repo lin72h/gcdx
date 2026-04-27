@@ -126,6 +126,7 @@ else
   cc \
     "${repo_root}/csrc/twq_pressure_provider_preview.c" \
     "${repo_root}/csrc/twq_pressure_provider_adapter.c" \
+    "${repo_root}/csrc/twq_pressure_provider_session.c" \
     "${repo_root}/csrc/twq_pressure_provider_observer.c" \
     "${repo_root}/csrc/twq_pressure_provider_observer_probe.c" \
     -lc \

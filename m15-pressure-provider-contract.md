@@ -10,7 +10,7 @@ It does not introduce a live SPI or ABI.
 Its job is narrower:
 
 1. make the provider boundary self-describing inside the derived, live,
-   adapter, and preview artifacts;
+   adapter, session, observer, tracker, bundle, and preview artifacts;
 2. give future consumers one checked-in contract file to build against;
 3. stop the pressure-provider surface from drifting silently through docs,
    comparators, and baselines.
@@ -56,7 +56,7 @@ This matters because the derived artifact does not record every category on
 every mode. The contract must model that honestly instead of forcing fields
 that the underlying mode never observed.
 
-## Derived Versus Live Versus Adapter Versus Preview
+## Derived Versus Live Versus Adapter Versus Session Versus Observer Versus Tracker Versus Bundle Versus Preview
 
 The same contract now applies to all current artifact families, but the timing
 and rawness surfaces still differ:
@@ -68,7 +68,19 @@ and rawness surfaces still differ:
 3. adapter artifact:
    monotonic generation sequence, real monotonic timestamps, aggregate view v1
    above the raw snapshot and without per-bucket diagnostics
-4. preview artifact:
+4. session artifact:
+   monotonic generation sequence, real monotonic timestamps, callable
+   session v1 owning the base snapshot and returning aggregate view v1
+5. observer artifact:
+   monotonic generation sequence, real monotonic timestamps, pressure observer
+   v1 summary above callable session v1
+6. tracker artifact:
+   monotonic generation sequence, real monotonic timestamps, pressure
+   transition tracker v1 summary above callable session v1
+7. bundle artifact:
+   monotonic generation sequence, real monotonic timestamps, callable bundle
+   v1 combining one session poll with observer and tracker updates
+8. preview artifact:
    monotonic generation sequence, real monotonic timestamps, raw snapshot v1
    capture below the higher-level projections
 
@@ -88,7 +100,11 @@ The contract lane validates all checked-in artifact families:
 1. the derived pressure-provider baseline
 2. the live pressure-provider smoke baseline
 3. the aggregate adapter pressure-provider smoke baseline
-4. the raw preview pressure-provider smoke baseline
+4. the callable session pressure-provider smoke baseline
+5. the observer pressure-provider smoke baseline
+6. the tracker pressure-provider smoke baseline
+7. the bundle pressure-provider smoke baseline
+8. the raw preview pressure-provider smoke baseline
 
 ## Exit Rule
 
@@ -97,7 +113,15 @@ This contract lane stays healthy only if:
 1. all artifact families carry the same top-level `contract` object
 2. all artifact families still satisfy the checked-in contract file
 3. conditional per-bucket fields stay aligned with their feedback flags
-4. preview-only raw snapshot fields stay versioned and explicit instead of
+4. session-only callable surface fields stay versioned and explicit instead of
+   silently turning the prep lane into a placement decision
+5. observer-only summary provenance stays versioned and explicit instead of
+   silently bypassing the callable session surface
+6. tracker-only transition summary provenance stays versioned and explicit
+   instead of silently bypassing the callable session surface
+7. bundle-only combined summary provenance stays versioned and explicit
+   instead of silently becoming a TBBX or TCM policy object
+8. preview-only raw snapshot fields stay versioned and explicit instead of
    leaking upward as accidental contract growth
-5. any future widening of the surface becomes an explicit contract version
+9. any future widening of the surface becomes an explicit contract version
    change, not a silent shape drift

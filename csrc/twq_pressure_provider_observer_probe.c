@@ -1,6 +1,5 @@
-#include "twq_pressure_provider_adapter.h"
 #include "twq_pressure_provider_observer.h"
-#include "twq_pressure_provider_preview.h"
+#include "twq_pressure_provider_session.h"
 
 #include <errno.h>
 #include <inttypes.h>
@@ -58,6 +57,8 @@ emit_observer_summary(const char *label, uint32_t interval_ms,
 	    "\"observer\":{"
 	    "\"struct_size\":%zu,"
 	    "\"version\":%u,"
+	    "\"source_session_struct_size\":%zu,"
+	    "\"source_session_version\":%u,"
 	    "\"source_view_struct_size\":%zu,"
 	    "\"source_view_version\":%u,"
 	    "\"sample_count\":%" PRIu64 ","
@@ -85,7 +86,8 @@ emit_observer_summary(const char *label, uint32_t interval_ms,
 	    "}},\"meta\":{\"component\":\"c\","
 	    "\"binary\":\"twq-pressure-provider-observer-probe\"}}\n",
 	    label, interval_ms, duration_ms, observer->struct_size,
-	    observer->version, observer->source_view_struct_size,
+	    observer->version, observer->source_session_struct_size,
+	    observer->source_session_version, observer->source_view_struct_size,
 	    observer->source_view_version, observer->sample_count,
 	    observer->generation_first, observer->generation_last,
 	    observer->generation_contiguous ? "true" : "false",
@@ -123,11 +125,10 @@ parse_u32_arg(const char *value, const char *name)
 int
 main(int argc, char **argv)
 {
-	struct twq_pressure_provider_snapshot_v1 base_snapshot, current_snapshot;
 	struct twq_pressure_provider_observer_v1 observer;
-	struct twq_pressure_provider_view_v1 view;
+	struct twq_pressure_provider_session_v1 session;
 	const char *label;
-	uint64_t deadline_ns, generation;
+	uint64_t deadline_ns;
 	uint32_t duration_ms, interval_ms;
 	int error, i;
 
@@ -170,35 +171,22 @@ main(int argc, char **argv)
 		return (64);
 	}
 
-	error = twq_pressure_provider_read_snapshot_v1(&base_snapshot);
+	twq_pressure_provider_session_init_v1(&session);
+	error = twq_pressure_provider_session_prime_v1(&session);
 	if (error != 0) {
-		emit_provider_error(label, "base-snapshot", error, 0);
+		emit_provider_error(label, "session-prime", error, 0);
 		return (1);
 	}
 
 	twq_pressure_provider_observer_init_v1(&observer);
 	deadline_ns = twq_pressure_provider_monotonic_time_ns() +
 	    (uint64_t)duration_ms * 1000000ULL;
-	generation = 0;
 	for (;;) {
-		error = twq_pressure_provider_read_snapshot_v1(&current_snapshot);
+		error = twq_pressure_provider_observer_poll_session_v1(&observer,
+		    &session);
 		if (error != 0) {
-			emit_provider_error(label, "sample-snapshot", error,
-			    generation + 1);
-			return (1);
-		}
-		generation++;
-		error = twq_pressure_provider_adapter_build_v1(&view, generation,
-		    &base_snapshot, &current_snapshot);
-		if (error != 0) {
-			emit_provider_error(label, "adapter-build", error,
-			    generation);
-			return (1);
-		}
-		error = twq_pressure_provider_observer_update_v1(&observer, &view);
-		if (error != 0) {
-			emit_provider_error(label, "observer-update", error,
-			    generation);
+			emit_provider_error(label, "observer-poll-session", error,
+			    session.next_generation);
 			return (1);
 		}
 		if (twq_pressure_provider_monotonic_time_ns() >= deadline_ns)

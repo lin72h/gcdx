@@ -126,6 +126,20 @@ defmodule TwqTest.VM do
     )
   end
 
+  @spec run_m15_pressure_provider_session_smoke(keyword()) :: Command.Result.t()
+  def run_m15_pressure_provider_session_smoke(opts \\ []) do
+    env = build_env(opts)
+
+    script =
+      Path.join(env.repo_root, "scripts/benchmarks/run-m15-pressure-provider-session-smoke.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> session_pressure_provider_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
   @spec run_m15_pressure_provider_observer_smoke(keyword()) :: Command.Result.t()
   def run_m15_pressure_provider_observer_smoke(opts \\ []) do
     env = build_env(opts)
@@ -136,6 +150,104 @@ defmodule TwqTest.VM do
     Command.run(script, [],
       cd: env.repo_root,
       env: Env.script_env(env) |> observer_pressure_provider_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
+  @spec run_m15_pressure_provider_observer_replay(keyword()) :: Command.Result.t()
+  def run_m15_pressure_provider_observer_replay(opts \\ []) do
+    env = build_env(opts)
+
+    script =
+      Path.join(env.repo_root, "scripts/benchmarks/run-m15-pressure-provider-observer-replay.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> observer_replay_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
+  @spec run_m15_pressure_provider_tracker_smoke(keyword()) :: Command.Result.t()
+  def run_m15_pressure_provider_tracker_smoke(opts \\ []) do
+    env = build_env(opts)
+
+    script =
+      Path.join(env.repo_root, "scripts/benchmarks/run-m15-pressure-provider-tracker-smoke.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> tracker_pressure_provider_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
+  @spec run_m15_pressure_provider_tracker_replay(keyword()) :: Command.Result.t()
+  def run_m15_pressure_provider_tracker_replay(opts \\ []) do
+    env = build_env(opts)
+
+    script =
+      Path.join(env.repo_root, "scripts/benchmarks/run-m15-pressure-provider-tracker-replay.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> tracker_replay_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
+  @spec run_m15_pressure_provider_bundle_smoke(keyword()) :: Command.Result.t()
+  def run_m15_pressure_provider_bundle_smoke(opts \\ []) do
+    env = build_env(opts)
+
+    script =
+      Path.join(env.repo_root, "scripts/benchmarks/run-m15-pressure-provider-bundle-smoke.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> bundle_pressure_provider_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
+  @spec run_m15_pressure_provider_bundle_replay(keyword()) :: Command.Result.t()
+  def run_m15_pressure_provider_bundle_replay(opts \\ []) do
+    env = build_env(opts)
+
+    script =
+      Path.join(env.repo_root, "scripts/benchmarks/run-m15-pressure-provider-bundle-replay.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> bundle_replay_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
+  @spec run_m15_tbbx_n0_gcd_only_baseline(keyword()) :: Command.Result.t()
+  def run_m15_tbbx_n0_gcd_only_baseline(opts \\ []) do
+    env = build_env(opts)
+
+    script =
+      Path.join(env.repo_root, "scripts/benchmarks/run-m15-tbbx-n0-gcd-only-baseline.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> tbbx_n0_gcd_only_env(opts),
+      timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
+    )
+  end
+
+  @spec run_m15_pressure_provider_stack_gate(keyword()) :: Command.Result.t()
+  def run_m15_pressure_provider_stack_gate(opts \\ []) do
+    env = build_env(opts)
+
+    script =
+      Path.join(env.repo_root, "scripts/benchmarks/run-m15-pressure-provider-stack-gate.sh")
+
+    Command.run(script, [],
+      cd: env.repo_root,
+      env: Env.script_env(env) |> pressure_provider_stack_env(opts),
       timeout: Keyword.get(opts, :gate_timeout_ms, env.command_timeout_ms)
     )
   end
@@ -456,6 +568,30 @@ defmodule TwqTest.VM do
     end)
   end
 
+  defp session_pressure_provider_env(script_env, opts) do
+    option_env = %{
+      m15_session_baseline: "TWQ_M15_SESSION_BASELINE",
+      m15_session_candidate_json: "TWQ_M15_SESSION_CANDIDATE_JSON",
+      m15_session_out_dir: "TWQ_M15_SESSION_OUT_DIR",
+      m15_session_serial_log: "TWQ_M15_SESSION_SERIAL_LOG",
+      m15_session_comparison_json: "TWQ_M15_SESSION_COMPARISON_JSON",
+      m15_session_comparison_log: "TWQ_M15_SESSION_COMPARISON_LOG",
+      m15_session_summary_md: "TWQ_M15_SESSION_SUMMARY_MD",
+      m15_session_label: "TWQ_M15_SESSION_LABEL",
+      m15_session_capture_modes: "TWQ_M15_SESSION_CAPTURE_MODES",
+      m15_session_interval_ms: "TWQ_M15_SESSION_INTERVAL_MS",
+      m15_session_pressure_ms: "TWQ_M15_SESSION_PRESSURE_MS",
+      m15_session_sustained_ms: "TWQ_M15_SESSION_SUSTAINED_MS"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
   defp observer_pressure_provider_env(script_env, opts) do
     option_env = %{
       m15_observer_baseline: "TWQ_M15_OBSERVER_BASELINE",
@@ -470,6 +606,170 @@ defmodule TwqTest.VM do
       m15_observer_interval_ms: "TWQ_M15_OBSERVER_INTERVAL_MS",
       m15_observer_pressure_ms: "TWQ_M15_OBSERVER_PRESSURE_MS",
       m15_observer_sustained_ms: "TWQ_M15_OBSERVER_SUSTAINED_MS"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
+  defp observer_replay_env(script_env, opts) do
+    option_env = %{
+      m15_observer_replay_baseline: "TWQ_M15_OBSERVER_REPLAY_BASELINE",
+      m15_observer_replay_session_artifact: "TWQ_M15_OBSERVER_REPLAY_SESSION_ARTIFACT",
+      m15_observer_replay_candidate_json: "TWQ_M15_OBSERVER_REPLAY_CANDIDATE_JSON",
+      m15_observer_replay_out_dir: "TWQ_M15_OBSERVER_REPLAY_OUT_DIR",
+      m15_observer_replay_comparison_json: "TWQ_M15_OBSERVER_REPLAY_COMPARISON_JSON",
+      m15_observer_replay_comparison_log: "TWQ_M15_OBSERVER_REPLAY_COMPARISON_LOG",
+      m15_observer_replay_summary_md: "TWQ_M15_OBSERVER_REPLAY_SUMMARY_MD",
+      m15_observer_replay_label: "TWQ_M15_OBSERVER_REPLAY_LABEL"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
+  defp tracker_pressure_provider_env(script_env, opts) do
+    option_env = %{
+      m15_tracker_baseline: "TWQ_M15_TRACKER_BASELINE",
+      m15_tracker_candidate_json: "TWQ_M15_TRACKER_CANDIDATE_JSON",
+      m15_tracker_out_dir: "TWQ_M15_TRACKER_OUT_DIR",
+      m15_tracker_serial_log: "TWQ_M15_TRACKER_SERIAL_LOG",
+      m15_tracker_comparison_json: "TWQ_M15_TRACKER_COMPARISON_JSON",
+      m15_tracker_comparison_log: "TWQ_M15_TRACKER_COMPARISON_LOG",
+      m15_tracker_summary_md: "TWQ_M15_TRACKER_SUMMARY_MD",
+      m15_tracker_label: "TWQ_M15_TRACKER_LABEL",
+      m15_tracker_capture_modes: "TWQ_M15_TRACKER_CAPTURE_MODES",
+      m15_tracker_interval_ms: "TWQ_M15_TRACKER_INTERVAL_MS",
+      m15_tracker_pressure_ms: "TWQ_M15_TRACKER_PRESSURE_MS",
+      m15_tracker_sustained_ms: "TWQ_M15_TRACKER_SUSTAINED_MS"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
+  defp tracker_replay_env(script_env, opts) do
+    option_env = %{
+      m15_tracker_replay_baseline: "TWQ_M15_TRACKER_REPLAY_BASELINE",
+      m15_tracker_replay_session_artifact: "TWQ_M15_TRACKER_REPLAY_SESSION_ARTIFACT",
+      m15_tracker_replay_candidate_json: "TWQ_M15_TRACKER_REPLAY_CANDIDATE_JSON",
+      m15_tracker_replay_out_dir: "TWQ_M15_TRACKER_REPLAY_OUT_DIR",
+      m15_tracker_replay_comparison_json: "TWQ_M15_TRACKER_REPLAY_COMPARISON_JSON",
+      m15_tracker_replay_comparison_log: "TWQ_M15_TRACKER_REPLAY_COMPARISON_LOG",
+      m15_tracker_replay_summary_md: "TWQ_M15_TRACKER_REPLAY_SUMMARY_MD",
+      m15_tracker_replay_label: "TWQ_M15_TRACKER_REPLAY_LABEL"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
+  defp bundle_pressure_provider_env(script_env, opts) do
+    option_env = %{
+      m15_bundle_baseline: "TWQ_M15_BUNDLE_BASELINE",
+      m15_bundle_candidate_json: "TWQ_M15_BUNDLE_CANDIDATE_JSON",
+      m15_bundle_out_dir: "TWQ_M15_BUNDLE_OUT_DIR",
+      m15_bundle_serial_log: "TWQ_M15_BUNDLE_SERIAL_LOG",
+      m15_bundle_comparison_json: "TWQ_M15_BUNDLE_COMPARISON_JSON",
+      m15_bundle_comparison_log: "TWQ_M15_BUNDLE_COMPARISON_LOG",
+      m15_bundle_summary_md: "TWQ_M15_BUNDLE_SUMMARY_MD",
+      m15_bundle_label: "TWQ_M15_BUNDLE_LABEL",
+      m15_bundle_capture_modes: "TWQ_M15_BUNDLE_CAPTURE_MODES",
+      m15_bundle_interval_ms: "TWQ_M15_BUNDLE_INTERVAL_MS",
+      m15_bundle_pressure_ms: "TWQ_M15_BUNDLE_PRESSURE_MS",
+      m15_bundle_sustained_ms: "TWQ_M15_BUNDLE_SUSTAINED_MS"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
+  defp bundle_replay_env(script_env, opts) do
+    option_env = %{
+      m15_bundle_replay_baseline: "TWQ_M15_BUNDLE_REPLAY_BASELINE",
+      m15_bundle_replay_session_artifact: "TWQ_M15_BUNDLE_REPLAY_SESSION_ARTIFACT",
+      m15_bundle_replay_candidate_json: "TWQ_M15_BUNDLE_REPLAY_CANDIDATE_JSON",
+      m15_bundle_replay_out_dir: "TWQ_M15_BUNDLE_REPLAY_OUT_DIR",
+      m15_bundle_replay_comparison_json: "TWQ_M15_BUNDLE_REPLAY_COMPARISON_JSON",
+      m15_bundle_replay_comparison_log: "TWQ_M15_BUNDLE_REPLAY_COMPARISON_LOG",
+      m15_bundle_replay_summary_md: "TWQ_M15_BUNDLE_REPLAY_SUMMARY_MD",
+      m15_bundle_replay_label: "TWQ_M15_BUNDLE_REPLAY_LABEL"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
+  defp tbbx_n0_gcd_only_env(script_env, opts) do
+    option_env = %{
+      m15_tbbx_n0_gcd_out_dir: "TWQ_M15_TBBX_N0_GCD_OUT_DIR",
+      m15_tbbx_n0_gcd_candidate_json: "TWQ_M15_TBBX_N0_GCD_CANDIDATE_JSON",
+      m15_tbbx_n0_gcd_serial_log: "TWQ_M15_TBBX_N0_GCD_SERIAL_LOG",
+      m15_tbbx_n0_gcd_summary_md: "TWQ_M15_TBBX_N0_GCD_SUMMARY_MD",
+      m15_tbbx_n0_gcd_interval_ms: "TWQ_M15_TBBX_N0_GCD_INTERVAL_MS",
+      m15_tbbx_n0_gcd_pressure_ms: "TWQ_M15_TBBX_N0_GCD_PRESSURE_MS",
+      m15_tbbx_n0_gcd_sustained_ms: "TWQ_M15_TBBX_N0_GCD_SUSTAINED_MS"
+    }
+
+    Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->
+      case Keyword.get(opts, option) do
+        nil -> acc
+        value -> Map.put(acc, env_key, to_string(value))
+      end
+    end)
+  end
+
+  defp pressure_provider_stack_env(script_env, opts) do
+    option_env = %{
+      m15_stack_out_dir: "TWQ_M15_STACK_OUT_DIR",
+      m15_stack_summary_md: "TWQ_M15_STACK_SUMMARY_MD",
+      m15_stack_json: "TWQ_M15_STACK_JSON",
+      m15_stack_contract_json: "TWQ_M15_STACK_CONTRACT_JSON",
+      m15_stack_crossover_source: "TWQ_M15_STACK_CROSSOVER_SOURCE",
+      m15_stack_derived_baseline: "TWQ_M15_STACK_DERIVED_BASELINE",
+      m15_stack_live_baseline: "TWQ_M15_STACK_LIVE_BASELINE",
+      m15_stack_preview_baseline: "TWQ_M15_STACK_PREVIEW_BASELINE",
+      m15_stack_adapter_baseline: "TWQ_M15_STACK_ADAPTER_BASELINE",
+      m15_stack_session_baseline: "TWQ_M15_STACK_SESSION_BASELINE",
+      m15_stack_observer_baseline: "TWQ_M15_STACK_OBSERVER_BASELINE",
+      m15_stack_tracker_baseline: "TWQ_M15_STACK_TRACKER_BASELINE",
+      m15_stack_bundle_baseline: "TWQ_M15_STACK_BUNDLE_BASELINE",
+      m15_stack_derived_candidate_json: "TWQ_M15_STACK_DERIVED_CANDIDATE_JSON",
+      m15_stack_live_candidate_json: "TWQ_M15_STACK_LIVE_CANDIDATE_JSON",
+      m15_stack_preview_candidate_json: "TWQ_M15_STACK_PREVIEW_CANDIDATE_JSON",
+      m15_stack_adapter_candidate_json: "TWQ_M15_STACK_ADAPTER_CANDIDATE_JSON",
+      m15_stack_session_candidate_json: "TWQ_M15_STACK_SESSION_CANDIDATE_JSON",
+      m15_stack_observer_candidate_json: "TWQ_M15_STACK_OBSERVER_CANDIDATE_JSON",
+      m15_stack_tracker_candidate_json: "TWQ_M15_STACK_TRACKER_CANDIDATE_JSON",
+      m15_stack_bundle_candidate_json: "TWQ_M15_STACK_BUNDLE_CANDIDATE_JSON",
+      m15_stack_observer_replay_session_artifact:
+        "TWQ_M15_STACK_OBSERVER_REPLAY_SESSION_ARTIFACT",
+      m15_stack_tracker_replay_session_artifact: "TWQ_M15_STACK_TRACKER_REPLAY_SESSION_ARTIFACT",
+      m15_stack_bundle_replay_session_artifact: "TWQ_M15_STACK_BUNDLE_REPLAY_SESSION_ARTIFACT"
     }
 
     Enum.reduce(option_env, script_env, fn {option, env_key}, acc ->

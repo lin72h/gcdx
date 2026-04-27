@@ -2,10 +2,10 @@ defmodule TwqTest.PressureProviderContract do
   @moduledoc """
   Elixir-side validation for the repo-owned M15 pressure-provider contract.
 
-  This module checks that the derived, live, adapter, and preview pressure-only
-  artifacts remain self-describing and structurally consistent with the
-  checked-in contract, without claiming that the repo already exposes a real
-  provider SPI.
+  This module checks that the derived, live, adapter, session, observer,
+  tracker, bundle, and preview pressure-only artifacts remain self-describing
+  and structurally consistent with the checked-in contract, without claiming
+  that the repo already exposes a real provider SPI.
   """
 
   alias TwqTest.JSON
@@ -24,10 +24,14 @@ defmodule TwqTest.PressureProviderContract do
     |> normalize_nulls()
   end
 
-  @spec validate(String.t() | map(), String.t() | map(), :derived | :live | :adapter | :preview) ::
+  @spec validate(
+          String.t() | map(),
+          String.t() | map(),
+          :derived | :live | :adapter | :session | :observer | :tracker | :bundle | :preview
+        ) ::
           validation()
   def validate(contract_path_or_map, artifact_path_or_map, kind)
-      when kind in [:derived, :live, :adapter, :preview] do
+      when kind in [:derived, :live, :adapter, :session, :observer, :tracker, :bundle, :preview] do
     contract =
       if is_binary(contract_path_or_map),
         do: load(contract_path_or_map),
@@ -133,6 +137,123 @@ defmodule TwqTest.PressureProviderContract do
         |> compare_exact(
           "metadata.monotonic_time_kind",
           get_in(contract, ["preview", "monotonic_time_kind"]),
+          get_in(artifact, ["metadata", "monotonic_time_kind"])
+        )
+
+      :session ->
+        {checks, failures}
+        |> compare_exact(
+          "session_kind",
+          get_in(contract, ["session", "session_kind"]),
+          artifact["session_kind"]
+        )
+        |> compare_exact(
+          "view_kind",
+          get_in(contract, ["session", "view_kind"]),
+          artifact["view_kind"]
+        )
+        |> compare_exact(
+          "metadata.generation_kind",
+          get_in(contract, ["session", "generation_kind"]),
+          get_in(artifact, ["metadata", "generation_kind"])
+        )
+        |> compare_exact(
+          "metadata.monotonic_time_kind",
+          get_in(contract, ["session", "monotonic_time_kind"]),
+          get_in(artifact, ["metadata", "monotonic_time_kind"])
+        )
+
+      :observer ->
+        {checks, failures}
+        |> compare_exact(
+          "observer_kind",
+          get_in(contract, ["observer", "observer_kind"]),
+          artifact["observer_kind"]
+        )
+        |> compare_exact(
+          "source_session_kind",
+          get_in(contract, ["observer", "source_session_kind"]),
+          artifact["source_session_kind"]
+        )
+        |> compare_exact(
+          "source_view_kind",
+          get_in(contract, ["observer", "source_view_kind"]),
+          artifact["source_view_kind"]
+        )
+        |> compare_exact(
+          "metadata.generation_kind",
+          get_in(contract, ["observer", "generation_kind"]),
+          get_in(artifact, ["metadata", "generation_kind"])
+        )
+        |> compare_exact(
+          "metadata.monotonic_time_kind",
+          get_in(contract, ["observer", "monotonic_time_kind"]),
+          get_in(artifact, ["metadata", "monotonic_time_kind"])
+        )
+
+      :tracker ->
+        {checks, failures}
+        |> compare_exact(
+          "tracker_kind",
+          get_in(contract, ["tracker", "tracker_kind"]),
+          artifact["tracker_kind"]
+        )
+        |> compare_exact(
+          "source_session_kind",
+          get_in(contract, ["tracker", "source_session_kind"]),
+          artifact["source_session_kind"]
+        )
+        |> compare_exact(
+          "source_view_kind",
+          get_in(contract, ["tracker", "source_view_kind"]),
+          artifact["source_view_kind"]
+        )
+        |> compare_exact(
+          "metadata.generation_kind",
+          get_in(contract, ["tracker", "generation_kind"]),
+          get_in(artifact, ["metadata", "generation_kind"])
+        )
+        |> compare_exact(
+          "metadata.monotonic_time_kind",
+          get_in(contract, ["tracker", "monotonic_time_kind"]),
+          get_in(artifact, ["metadata", "monotonic_time_kind"])
+        )
+
+      :bundle ->
+        {checks, failures}
+        |> compare_exact(
+          "bundle_kind",
+          get_in(contract, ["bundle", "bundle_kind"]),
+          artifact["bundle_kind"]
+        )
+        |> compare_exact(
+          "source_session_kind",
+          get_in(contract, ["bundle", "source_session_kind"]),
+          artifact["source_session_kind"]
+        )
+        |> compare_exact(
+          "source_view_kind",
+          get_in(contract, ["bundle", "source_view_kind"]),
+          artifact["source_view_kind"]
+        )
+        |> compare_exact(
+          "source_observer_kind",
+          get_in(contract, ["bundle", "source_observer_kind"]),
+          artifact["source_observer_kind"]
+        )
+        |> compare_exact(
+          "source_tracker_kind",
+          get_in(contract, ["bundle", "source_tracker_kind"]),
+          artifact["source_tracker_kind"]
+        )
+        |> compare_exact(
+          "metadata.generation_kind",
+          get_in(contract, ["bundle", "generation_kind"]),
+          get_in(artifact, ["metadata", "generation_kind"])
+        )
+        |> compare_exact(
+          "metadata.monotonic_time_kind",
+          get_in(contract, ["bundle", "monotonic_time_kind"]),
           get_in(artifact, ["metadata", "monotonic_time_kind"])
         )
 
@@ -506,6 +627,314 @@ defmodule TwqTest.PressureProviderContract do
       end)
     else
       failure = "adapter artifact is missing captures"
+      check = %{kind: "shape", field: "captures", status: "fail", failure: failure}
+      {[check | checks], [failure | failures]}
+    end
+  end
+
+  defp validate_shape({checks, failures}, contract, artifact, :session) do
+    captures = artifact["captures"]
+
+    required_capture_fields =
+      MapSet.new(get_in(contract, ["session", "required_capture_fields"]) || [])
+
+    required_sample_fields =
+      MapSet.new(get_in(contract, ["session", "required_sample_fields"]) || [])
+
+    required_session_fields =
+      MapSet.new(get_in(contract, ["session", "required_session_fields"]) || [])
+
+    required_view_fields =
+      MapSet.new(get_in(contract, ["session", "required_view_fields"]) || [])
+
+    if is_map(captures) and map_size(captures) > 0 do
+      Enum.reduce(Enum.sort_by(captures, &elem(&1, 0)), {checks, failures}, fn {label, capture},
+                                                                               acc ->
+        acc =
+          Enum.reduce(Enum.sort(required_capture_fields), acc, fn field, {checks, failures} ->
+            if Map.has_key?(capture, field) do
+              check = %{
+                kind: "shape",
+                field: "captures.#{label}.#{field}",
+                status: "ok",
+                failure: nil
+              }
+
+              {[check | checks], failures}
+            else
+              failure = "captures.#{label}: field #{field} missing"
+
+              check = %{
+                kind: "shape",
+                field: "captures.#{label}.#{field}",
+                status: "fail",
+                failure: failure
+              }
+
+              {[check | checks], [failure | failures]}
+            end
+          end)
+
+        snapshots = capture["snapshots"]
+
+        if is_list(snapshots) and snapshots != [] do
+          Enum.with_index(snapshots)
+          |> Enum.reduce(acc, fn {snapshot, index}, acc ->
+            acc =
+              Enum.reduce(Enum.sort(required_sample_fields), acc, fn field, {checks, failures} ->
+                if Map.has_key?(snapshot, field) do
+                  check = %{
+                    kind: "shape",
+                    field: "captures.#{label}.snapshots[#{index}].#{field}",
+                    status: "ok",
+                    failure: nil
+                  }
+
+                  {[check | checks], failures}
+                else
+                  failure = "captures.#{label}.snapshots[#{index}]: field #{field} missing"
+
+                  check = %{
+                    kind: "shape",
+                    field: "captures.#{label}.snapshots[#{index}].#{field}",
+                    status: "fail",
+                    failure: failure
+                  }
+
+                  {[check | checks], [failure | failures]}
+                end
+              end)
+
+            session = snapshot["session"]
+
+            acc =
+              if is_map(session) do
+                Enum.reduce(Enum.sort(required_session_fields), acc, fn field,
+                                                                        {checks, failures} ->
+                  if Map.has_key?(session, field) do
+                    check = %{
+                      kind: "shape",
+                      field: "captures.#{label}.snapshots[#{index}].session.#{field}",
+                      status: "ok",
+                      failure: nil
+                    }
+
+                    {[check | checks], failures}
+                  else
+                    failure =
+                      "captures.#{label}.snapshots[#{index}]: session field #{field} missing"
+
+                    check = %{
+                      kind: "shape",
+                      field: "captures.#{label}.snapshots[#{index}].session.#{field}",
+                      status: "fail",
+                      failure: failure
+                    }
+
+                    {[check | checks], [failure | failures]}
+                  end
+                end)
+              else
+                {checks, failures} = acc
+
+                failure =
+                  "captures.#{label}.snapshots[#{index}]: session missing or not an object"
+
+                check = %{
+                  kind: "shape",
+                  field: "captures.#{label}.snapshots[#{index}].session",
+                  status: "fail",
+                  failure: failure
+                }
+
+                {[check | checks], [failure | failures]}
+              end
+
+            view = snapshot["view"]
+
+            if is_map(view) do
+              acc =
+                Enum.reduce(Enum.sort(required_view_fields), acc, fn field, {checks, failures} ->
+                  if Map.has_key?(view, field) do
+                    check = %{
+                      kind: "shape",
+                      field: "captures.#{label}.snapshots[#{index}].view.#{field}",
+                      status: "ok",
+                      failure: nil
+                    }
+
+                    {[check | checks], failures}
+                  else
+                    failure =
+                      "captures.#{label}.snapshots[#{index}]: view field #{field} missing"
+
+                    check = %{
+                      kind: "shape",
+                      field: "captures.#{label}.snapshots[#{index}].view.#{field}",
+                      status: "fail",
+                      failure: failure
+                    }
+
+                    {[check | checks], [failure | failures]}
+                  end
+                end)
+
+              validate_snapshot_shape(
+                acc,
+                contract,
+                "captures.#{label}.snapshots[#{index}].view",
+                view
+              )
+            else
+              {checks, failures} = acc
+              failure = "captures.#{label}.snapshots[#{index}]: view missing or not an object"
+
+              check = %{
+                kind: "shape",
+                field: "captures.#{label}.snapshots[#{index}].view",
+                status: "fail",
+                failure: failure
+              }
+
+              {[check | checks], [failure | failures]}
+            end
+          end)
+        else
+          {checks, failures} = acc
+          failure = "captures.#{label}: snapshots missing or empty"
+
+          check = %{
+            kind: "shape",
+            field: "captures.#{label}.snapshots",
+            status: "fail",
+            failure: failure
+          }
+
+          {[check | checks], [failure | failures]}
+        end
+      end)
+    else
+      failure = "session artifact is missing captures"
+      check = %{kind: "shape", field: "captures", status: "fail", failure: failure}
+      {[check | checks], [failure | failures]}
+    end
+  end
+
+  defp validate_shape({checks, failures}, contract, artifact, :observer) do
+    captures = artifact["captures"]
+
+    required_capture_fields =
+      MapSet.new(get_in(contract, ["observer", "required_capture_fields"]) || [])
+
+    if is_map(captures) and map_size(captures) > 0 do
+      Enum.reduce(Enum.sort_by(captures, &elem(&1, 0)), {checks, failures}, fn {label, capture},
+                                                                               acc ->
+        Enum.reduce(Enum.sort(required_capture_fields), acc, fn field, {checks, failures} ->
+          if Map.has_key?(capture, field) do
+            check = %{
+              kind: "shape",
+              field: "captures.#{label}.#{field}",
+              status: "ok",
+              failure: nil
+            }
+
+            {[check | checks], failures}
+          else
+            failure = "captures.#{label}: field #{field} missing"
+
+            check = %{
+              kind: "shape",
+              field: "captures.#{label}.#{field}",
+              status: "fail",
+              failure: failure
+            }
+
+            {[check | checks], [failure | failures]}
+          end
+        end)
+      end)
+    else
+      failure = "observer artifact is missing captures"
+      check = %{kind: "shape", field: "captures", status: "fail", failure: failure}
+      {[check | checks], [failure | failures]}
+    end
+  end
+
+  defp validate_shape({checks, failures}, contract, artifact, :tracker) do
+    captures = artifact["captures"]
+
+    required_capture_fields =
+      MapSet.new(get_in(contract, ["tracker", "required_capture_fields"]) || [])
+
+    if is_map(captures) and map_size(captures) > 0 do
+      Enum.reduce(Enum.sort_by(captures, &elem(&1, 0)), {checks, failures}, fn {label, capture},
+                                                                               acc ->
+        Enum.reduce(Enum.sort(required_capture_fields), acc, fn field, {checks, failures} ->
+          if Map.has_key?(capture, field) do
+            check = %{
+              kind: "shape",
+              field: "captures.#{label}.#{field}",
+              status: "ok",
+              failure: nil
+            }
+
+            {[check | checks], failures}
+          else
+            failure = "captures.#{label}: field #{field} missing"
+
+            check = %{
+              kind: "shape",
+              field: "captures.#{label}.#{field}",
+              status: "fail",
+              failure: failure
+            }
+
+            {[check | checks], [failure | failures]}
+          end
+        end)
+      end)
+    else
+      failure = "tracker artifact is missing captures"
+      check = %{kind: "shape", field: "captures", status: "fail", failure: failure}
+      {[check | checks], [failure | failures]}
+    end
+  end
+
+  defp validate_shape({checks, failures}, contract, artifact, :bundle) do
+    captures = artifact["captures"]
+
+    required_capture_fields =
+      MapSet.new(get_in(contract, ["bundle", "required_capture_fields"]) || [])
+
+    if is_map(captures) and map_size(captures) > 0 do
+      Enum.reduce(Enum.sort_by(captures, &elem(&1, 0)), {checks, failures}, fn {label, capture},
+                                                                               acc ->
+        Enum.reduce(Enum.sort(required_capture_fields), acc, fn field, {checks, failures} ->
+          if Map.has_key?(capture, field) do
+            check = %{
+              kind: "shape",
+              field: "captures.#{label}.#{field}",
+              status: "ok",
+              failure: nil
+            }
+
+            {[check | checks], failures}
+          else
+            failure = "captures.#{label}: field #{field} missing"
+
+            check = %{
+              kind: "shape",
+              field: "captures.#{label}.#{field}",
+              status: "fail",
+              failure: failure
+            }
+
+            {[check | checks], [failure | failures]}
+          end
+        end)
+      end)
+    else
+      failure = "bundle artifact is missing captures"
       check = %{kind: "shape", field: "captures", status: "fail", failure: failure}
       {[check | checks], [failure | failures]}
     end

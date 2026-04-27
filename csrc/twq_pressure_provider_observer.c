@@ -1,4 +1,5 @@
 #include "twq_pressure_provider_observer.h"
+#include "twq_pressure_provider_session.h"
 
 #include <errno.h>
 #include <string.h>
@@ -90,4 +91,37 @@ twq_pressure_provider_observer_update_v1(
 	observer->final_pressure_visible = view->pressure_visible ? 1 : 0;
 	observer->final_quiescent = quiescent ? 1 : 0;
 	return (0);
+}
+
+int
+twq_pressure_provider_observer_poll_session_v1(
+    struct twq_pressure_provider_observer_v1 *observer,
+    struct twq_pressure_provider_session_v1 *session)
+{
+	struct twq_pressure_provider_view_v1 view;
+	int error;
+
+	if (observer == NULL || session == NULL)
+		return (EINVAL);
+	if (session->version != TWQ_PRESSURE_PROVIDER_SESSION_VERSION ||
+	    session->struct_size != sizeof(*session))
+		return (EPROTO);
+	if (observer->version != TWQ_PRESSURE_PROVIDER_OBSERVER_VERSION ||
+	    observer->struct_size != sizeof(*observer)) {
+		twq_pressure_provider_observer_init_v1(observer);
+	}
+
+	error = twq_pressure_provider_session_poll_v1(session, &view);
+	if (error != 0)
+		return (error);
+
+	if (observer->sample_count == 0) {
+		observer->source_session_struct_size = session->struct_size;
+		observer->source_session_version = session->version;
+	} else if (observer->source_session_struct_size != session->struct_size ||
+	    observer->source_session_version != session->version) {
+		return (EPROTO);
+	}
+
+	return (twq_pressure_provider_observer_update_v1(observer, &view));
 }

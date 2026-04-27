@@ -19,6 +19,7 @@ defmodule TwqTest.PressureProviderObserver do
     ["contract", "per_bucket_scope"],
     ["contract", "diagnostic_fields"],
     ["observer_kind"],
+    ["source_session_kind"],
     ["source_view_kind"],
     ["metadata", "generation_kind"],
     ["metadata", "monotonic_time_kind"],
@@ -31,6 +32,8 @@ defmodule TwqTest.PressureProviderObserver do
     duration_ms
     struct_version
     struct_size
+    source_session_version
+    source_session_struct_size
     source_view_version
     source_view_struct_size
     final_pressure_visible

@@ -13,7 +13,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("contract", type=Path)
     parser.add_argument("artifact", type=Path)
     parser.add_argument(
-        "--kind", choices=("derived", "live", "adapter", "preview"), required=True
+        "--kind",
+        choices=(
+            "derived",
+            "live",
+            "adapter",
+            "session",
+            "observer",
+            "tracker",
+            "bundle",
+            "preview",
+        ),
+        required=True,
     )
     parser.add_argument("--json-out", type=Path)
     return parser.parse_args()
@@ -152,6 +163,277 @@ def validate_top_level(contract: dict, artifact: dict, kind: str, result: dict) 
             )
 
         expected_time = nested_get(contract, ("live", "monotonic_time_kind"))
+        actual_time = nested_get(artifact, ("metadata", "monotonic_time_kind"))
+        if actual_time == expected_time:
+            add_check(result, kind="top_level", field="metadata.monotonic_time_kind", status="ok", expected=expected_time, actual=actual_time)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="metadata.monotonic_time_kind",
+                status="fail",
+                expected=expected_time,
+                actual=actual_time,
+                failure=f"metadata.monotonic_time_kind differs (expected {expected_time!r}, actual {actual_time!r})",
+            )
+    elif kind == "session":
+        expected_session_kind = nested_get(contract, ("session", "session_kind"))
+        actual_session_kind = artifact.get("session_kind")
+        if actual_session_kind == expected_session_kind:
+            add_check(result, kind="top_level", field="session_kind", status="ok", expected=expected_session_kind, actual=actual_session_kind)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="session_kind",
+                status="fail",
+                expected=expected_session_kind,
+                actual=actual_session_kind,
+                failure=f"session_kind differs (expected {expected_session_kind!r}, actual {actual_session_kind!r})",
+            )
+
+        expected_view_kind = nested_get(contract, ("session", "view_kind"))
+        actual_view_kind = artifact.get("view_kind")
+        if actual_view_kind == expected_view_kind:
+            add_check(result, kind="top_level", field="view_kind", status="ok", expected=expected_view_kind, actual=actual_view_kind)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="view_kind",
+                status="fail",
+                expected=expected_view_kind,
+                actual=actual_view_kind,
+                failure=f"view_kind differs (expected {expected_view_kind!r}, actual {actual_view_kind!r})",
+            )
+
+        expected_generation = nested_get(contract, ("session", "generation_kind"))
+        actual_generation = nested_get(artifact, ("metadata", "generation_kind"))
+        if actual_generation == expected_generation:
+            add_check(result, kind="top_level", field="metadata.generation_kind", status="ok", expected=expected_generation, actual=actual_generation)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="metadata.generation_kind",
+                status="fail",
+                expected=expected_generation,
+                actual=actual_generation,
+                failure=f"metadata.generation_kind differs (expected {expected_generation!r}, actual {actual_generation!r})",
+            )
+
+        expected_time = nested_get(contract, ("session", "monotonic_time_kind"))
+        actual_time = nested_get(artifact, ("metadata", "monotonic_time_kind"))
+        if actual_time == expected_time:
+            add_check(result, kind="top_level", field="metadata.monotonic_time_kind", status="ok", expected=expected_time, actual=actual_time)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="metadata.monotonic_time_kind",
+                status="fail",
+                expected=expected_time,
+                actual=actual_time,
+                failure=f"metadata.monotonic_time_kind differs (expected {expected_time!r}, actual {actual_time!r})",
+            )
+    elif kind == "observer":
+        expected_observer_kind = nested_get(contract, ("observer", "observer_kind"))
+        actual_observer_kind = artifact.get("observer_kind")
+        if actual_observer_kind == expected_observer_kind:
+            add_check(result, kind="top_level", field="observer_kind", status="ok", expected=expected_observer_kind, actual=actual_observer_kind)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="observer_kind",
+                status="fail",
+                expected=expected_observer_kind,
+                actual=actual_observer_kind,
+                failure=f"observer_kind differs (expected {expected_observer_kind!r}, actual {actual_observer_kind!r})",
+            )
+
+        expected_source_session_kind = nested_get(contract, ("observer", "source_session_kind"))
+        actual_source_session_kind = artifact.get("source_session_kind")
+        if actual_source_session_kind == expected_source_session_kind:
+            add_check(result, kind="top_level", field="source_session_kind", status="ok", expected=expected_source_session_kind, actual=actual_source_session_kind)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="source_session_kind",
+                status="fail",
+                expected=expected_source_session_kind,
+                actual=actual_source_session_kind,
+                failure=f"source_session_kind differs (expected {expected_source_session_kind!r}, actual {actual_source_session_kind!r})",
+            )
+
+        expected_source_view_kind = nested_get(contract, ("observer", "source_view_kind"))
+        actual_source_view_kind = artifact.get("source_view_kind")
+        if actual_source_view_kind == expected_source_view_kind:
+            add_check(result, kind="top_level", field="source_view_kind", status="ok", expected=expected_source_view_kind, actual=actual_source_view_kind)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="source_view_kind",
+                status="fail",
+                expected=expected_source_view_kind,
+                actual=actual_source_view_kind,
+                failure=f"source_view_kind differs (expected {expected_source_view_kind!r}, actual {actual_source_view_kind!r})",
+            )
+
+        expected_generation = nested_get(contract, ("observer", "generation_kind"))
+        actual_generation = nested_get(artifact, ("metadata", "generation_kind"))
+        if actual_generation == expected_generation:
+            add_check(result, kind="top_level", field="metadata.generation_kind", status="ok", expected=expected_generation, actual=actual_generation)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="metadata.generation_kind",
+                status="fail",
+                expected=expected_generation,
+                actual=actual_generation,
+                failure=f"metadata.generation_kind differs (expected {expected_generation!r}, actual {actual_generation!r})",
+            )
+
+        expected_time = nested_get(contract, ("observer", "monotonic_time_kind"))
+        actual_time = nested_get(artifact, ("metadata", "monotonic_time_kind"))
+        if actual_time == expected_time:
+            add_check(result, kind="top_level", field="metadata.monotonic_time_kind", status="ok", expected=expected_time, actual=actual_time)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="metadata.monotonic_time_kind",
+                status="fail",
+                expected=expected_time,
+                actual=actual_time,
+                failure=f"metadata.monotonic_time_kind differs (expected {expected_time!r}, actual {actual_time!r})",
+            )
+    elif kind == "tracker":
+        expected_tracker_kind = nested_get(contract, ("tracker", "tracker_kind"))
+        actual_tracker_kind = artifact.get("tracker_kind")
+        if actual_tracker_kind == expected_tracker_kind:
+            add_check(result, kind="top_level", field="tracker_kind", status="ok", expected=expected_tracker_kind, actual=actual_tracker_kind)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="tracker_kind",
+                status="fail",
+                expected=expected_tracker_kind,
+                actual=actual_tracker_kind,
+                failure=f"tracker_kind differs (expected {expected_tracker_kind!r}, actual {actual_tracker_kind!r})",
+            )
+
+        expected_source_session_kind = nested_get(contract, ("tracker", "source_session_kind"))
+        actual_source_session_kind = artifact.get("source_session_kind")
+        if actual_source_session_kind == expected_source_session_kind:
+            add_check(result, kind="top_level", field="source_session_kind", status="ok", expected=expected_source_session_kind, actual=actual_source_session_kind)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="source_session_kind",
+                status="fail",
+                expected=expected_source_session_kind,
+                actual=actual_source_session_kind,
+                failure=f"source_session_kind differs (expected {expected_source_session_kind!r}, actual {actual_source_session_kind!r})",
+            )
+
+        expected_source_view_kind = nested_get(contract, ("tracker", "source_view_kind"))
+        actual_source_view_kind = artifact.get("source_view_kind")
+        if actual_source_view_kind == expected_source_view_kind:
+            add_check(result, kind="top_level", field="source_view_kind", status="ok", expected=expected_source_view_kind, actual=actual_source_view_kind)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="source_view_kind",
+                status="fail",
+                expected=expected_source_view_kind,
+                actual=actual_source_view_kind,
+                failure=f"source_view_kind differs (expected {expected_source_view_kind!r}, actual {actual_source_view_kind!r})",
+            )
+
+        expected_generation = nested_get(contract, ("tracker", "generation_kind"))
+        actual_generation = nested_get(artifact, ("metadata", "generation_kind"))
+        if actual_generation == expected_generation:
+            add_check(result, kind="top_level", field="metadata.generation_kind", status="ok", expected=expected_generation, actual=actual_generation)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="metadata.generation_kind",
+                status="fail",
+                expected=expected_generation,
+                actual=actual_generation,
+                failure=f"metadata.generation_kind differs (expected {expected_generation!r}, actual {actual_generation!r})",
+            )
+
+        expected_time = nested_get(contract, ("tracker", "monotonic_time_kind"))
+        actual_time = nested_get(artifact, ("metadata", "monotonic_time_kind"))
+        if actual_time == expected_time:
+            add_check(result, kind="top_level", field="metadata.monotonic_time_kind", status="ok", expected=expected_time, actual=actual_time)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="metadata.monotonic_time_kind",
+                status="fail",
+                expected=expected_time,
+                actual=actual_time,
+                failure=f"metadata.monotonic_time_kind differs (expected {expected_time!r}, actual {actual_time!r})",
+            )
+    elif kind == "bundle":
+        expected_bundle_kind = nested_get(contract, ("bundle", "bundle_kind"))
+        actual_bundle_kind = artifact.get("bundle_kind")
+        if actual_bundle_kind == expected_bundle_kind:
+            add_check(result, kind="top_level", field="bundle_kind", status="ok", expected=expected_bundle_kind, actual=actual_bundle_kind)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="bundle_kind",
+                status="fail",
+                expected=expected_bundle_kind,
+                actual=actual_bundle_kind,
+                failure=f"bundle_kind differs (expected {expected_bundle_kind!r}, actual {actual_bundle_kind!r})",
+            )
+
+        for source_field in ("source_session_kind", "source_view_kind", "source_observer_kind", "source_tracker_kind"):
+            expected_source_kind = nested_get(contract, ("bundle", source_field))
+            actual_source_kind = artifact.get(source_field)
+            if actual_source_kind == expected_source_kind:
+                add_check(result, kind="top_level", field=source_field, status="ok", expected=expected_source_kind, actual=actual_source_kind)
+            else:
+                add_check(
+                    result,
+                    kind="top_level",
+                    field=source_field,
+                    status="fail",
+                    expected=expected_source_kind,
+                    actual=actual_source_kind,
+                    failure=f"{source_field} differs (expected {expected_source_kind!r}, actual {actual_source_kind!r})",
+                )
+
+        expected_generation = nested_get(contract, ("bundle", "generation_kind"))
+        actual_generation = nested_get(artifact, ("metadata", "generation_kind"))
+        if actual_generation == expected_generation:
+            add_check(result, kind="top_level", field="metadata.generation_kind", status="ok", expected=expected_generation, actual=actual_generation)
+        else:
+            add_check(
+                result,
+                kind="top_level",
+                field="metadata.generation_kind",
+                status="fail",
+                expected=expected_generation,
+                actual=actual_generation,
+                failure=f"metadata.generation_kind differs (expected {expected_generation!r}, actual {actual_generation!r})",
+            )
+
+        expected_time = nested_get(contract, ("bundle", "monotonic_time_kind"))
         actual_time = nested_get(artifact, ("metadata", "monotonic_time_kind"))
         if actual_time == expected_time:
             add_check(result, kind="top_level", field="metadata.monotonic_time_kind", status="ok", expected=expected_time, actual=actual_time)
@@ -440,6 +722,109 @@ def validate_adapter(contract: dict, artifact: dict, result: dict) -> None:
             validate_snapshot_shape(prefix, contract, snapshot, result)
 
 
+def validate_session(contract: dict, artifact: dict, result: dict) -> None:
+    captures = artifact.get("captures")
+    if not isinstance(captures, dict) or not captures:
+        add_check(
+            result,
+            kind="shape",
+            field="captures",
+            status="fail",
+            failure="session artifact is missing captures",
+        )
+        return
+
+    required_capture_fields = set(nested_get(contract, ("session", "required_capture_fields")) or [])
+    required_sample_fields = set(nested_get(contract, ("session", "required_sample_fields")) or [])
+    required_session_fields = set(nested_get(contract, ("session", "required_session_fields")) or [])
+    required_view_fields = set(nested_get(contract, ("session", "required_view_fields")) or [])
+
+    for label, capture in sorted(captures.items()):
+        for field in sorted(required_capture_fields):
+            if field in capture:
+                add_check(result, kind="shape", field=f"captures.{label}.{field}", status="ok")
+            else:
+                add_check(
+                    result,
+                    kind="shape",
+                    field=f"captures.{label}.{field}",
+                    status="fail",
+                    failure=f"captures.{label}: field {field} missing",
+                )
+
+        snapshots = capture.get("snapshots")
+        if not isinstance(snapshots, list) or not snapshots:
+            add_check(
+                result,
+                kind="shape",
+                field=f"captures.{label}.snapshots",
+                status="fail",
+                failure=f"captures.{label}: snapshots missing or empty",
+            )
+            continue
+
+        for index, snapshot in enumerate(snapshots):
+            prefix = f"captures.{label}.snapshots[{index}]"
+            for field in sorted(required_sample_fields):
+                if field in snapshot:
+                    add_check(result, kind="shape", field=f"{prefix}.{field}", status="ok")
+                else:
+                    add_check(
+                        result,
+                        kind="shape",
+                        field=f"{prefix}.{field}",
+                        status="fail",
+                        failure=f"{prefix}: field {field} missing",
+                    )
+
+            session = snapshot.get("session")
+            if not isinstance(session, dict):
+                add_check(
+                    result,
+                    kind="shape",
+                    field=f"{prefix}.session",
+                    status="fail",
+                    failure=f"{prefix}: session missing or not an object",
+                )
+            else:
+                for field in sorted(required_session_fields):
+                    if field in session:
+                        add_check(result, kind="shape", field=f"{prefix}.session.{field}", status="ok")
+                    else:
+                        add_check(
+                            result,
+                            kind="shape",
+                            field=f"{prefix}.session.{field}",
+                            status="fail",
+                            failure=f"{prefix}: session field {field} missing",
+                        )
+
+            view = snapshot.get("view")
+            if not isinstance(view, dict):
+                add_check(
+                    result,
+                    kind="shape",
+                    field=f"{prefix}.view",
+                    status="fail",
+                    failure=f"{prefix}: view missing or not an object",
+                )
+                continue
+
+            for field in sorted(required_view_fields):
+                if field in view:
+                    add_check(result, kind="shape", field=f"{prefix}.view.{field}", status="ok")
+                else:
+                    add_check(
+                        result,
+                        kind="shape",
+                        field=f"{prefix}.view.{field}",
+                        status="fail",
+                        failure=f"{prefix}: view field {field} missing",
+                    )
+
+            validate_snapshot_shape(f"{prefix}.view", contract, view, result)
+
+
 def validate_preview(contract: dict, artifact: dict, result: dict) -> None:
     captures = artifact.get("captures")
     if not isinstance(captures, dict) or not captures:
@@ -527,6 +912,90 @@ def validate_preview(contract: dict, artifact: dict, result: dict) -> None:
                     )
 
 
+def validate_observer(contract: dict, artifact: dict, result: dict) -> None:
+    captures = artifact.get("captures")
+    if not isinstance(captures, dict) or not captures:
+        add_check(
+            result,
+            kind="shape",
+            field="captures",
+            status="fail",
+            failure="observer artifact is missing captures",
+        )
+        return
+
+    required_capture_fields = set(nested_get(contract, ("observer", "required_capture_fields")) or [])
+
+    for label, capture in sorted(captures.items()):
+        for field in sorted(required_capture_fields):
+            if field in capture:
+                add_check(result, kind="shape", field=f"captures.{label}.{field}", status="ok")
+            else:
+                add_check(
+                    result,
+                    kind="shape",
+                    field=f"captures.{label}.{field}",
+                    status="fail",
+                    failure=f"captures.{label}: field {field} missing",
+                )
+
+
+def validate_tracker(contract: dict, artifact: dict, result: dict) -> None:
+    captures = artifact.get("captures")
+    if not isinstance(captures, dict) or not captures:
+        add_check(
+            result,
+            kind="shape",
+            field="captures",
+            status="fail",
+            failure="tracker artifact is missing captures",
+        )
+        return
+
+    required_capture_fields = set(nested_get(contract, ("tracker", "required_capture_fields")) or [])
+
+    for label, capture in sorted(captures.items()):
+        for field in sorted(required_capture_fields):
+            if field in capture:
+                add_check(result, kind="shape", field=f"captures.{label}.{field}", status="ok")
+            else:
+                add_check(
+                    result,
+                    kind="shape",
+                    field=f"captures.{label}.{field}",
+                    status="fail",
+                    failure=f"captures.{label}: field {field} missing",
+                )
+
+
+def validate_bundle(contract: dict, artifact: dict, result: dict) -> None:
+    captures = artifact.get("captures")
+    if not isinstance(captures, dict) or not captures:
+        add_check(
+            result,
+            kind="shape",
+            field="captures",
+            status="fail",
+            failure="bundle artifact is missing captures",
+        )
+        return
+
+    required_capture_fields = set(nested_get(contract, ("bundle", "required_capture_fields")) or [])
+
+    for label, capture in sorted(captures.items()):
+        for field in sorted(required_capture_fields):
+            if field in capture:
+                add_check(result, kind="shape", field=f"captures.{label}.{field}", status="ok")
+            else:
+                add_check(
+                    result,
+                    kind="shape",
+                    field=f"captures.{label}.{field}",
+                    status="fail",
+                    failure=f"captures.{label}: field {field} missing",
+                )
+
+
 def main() -> int:
     args = parse_args()
     contract = load(args.contract)
@@ -548,6 +1017,14 @@ def main() -> int:
         validate_live(contract, artifact, result)
     elif args.kind == "adapter":
         validate_adapter(contract, artifact, result)
+    elif args.kind == "session":
+        validate_session(contract, artifact, result)
+    elif args.kind == "observer":
+        validate_observer(contract, artifact, result)
+    elif args.kind == "tracker":
+        validate_tracker(contract, artifact, result)
+    elif args.kind == "bundle":
+        validate_bundle(contract, artifact, result)
     else:
         validate_preview(contract, artifact, result)
 

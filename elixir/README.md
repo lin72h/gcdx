@@ -140,6 +140,19 @@ This adapter lane still does not claim a SPI. It validates a versioned
 aggregate-only C view above the raw preview snapshot and below any real system
 surface.
 
+The callable session pressure-provider smoke lane is also visible through
+`TwqTest.PressureProviderSession` and
+`TwqTest.VM.run_m15_pressure_provider_session_smoke/1`. The current checked-in
+session baseline is:
+
+```text
+../benchmarks/baselines/m15-pressure-provider-session-smoke-20260417.json
+```
+
+This session lane still does not claim a system SPI. It validates a versioned
+callable session surface that owns the base snapshot and generation sequencing
+while returning the same aggregate-only pressure view.
+
 The observer pressure-provider smoke lane is also visible through
 `TwqTest.PressureProviderObserver` and
 `TwqTest.VM.run_m15_pressure_provider_observer_smoke/1`. The current
@@ -150,9 +163,64 @@ checked-in observer baseline is:
 ```
 
 This observer lane still does not claim an integration surface. It validates a
-policyless consumer-side summary above the aggregate adapter view, keeping the
-pressure-only boundary intact while proving that quiescence and backlog state
-can be tracked without promoting per-bucket diagnostics.
+policyless consumer-side summary above the callable session surface, keeping
+the pressure-only boundary intact while proving that quiescence and backlog
+state can be tracked without promoting per-bucket diagnostics.
+
+The host-side observer replay lane is also visible through
+`TwqTest.VM.run_m15_pressure_provider_observer_replay/1`. It derives an
+observer candidate from the checked-in session artifact and compares it
+against the checked-in observer baseline without booting a guest.
+
+The tracker pressure-provider smoke lane is also visible through
+`TwqTest.PressureProviderTracker` and
+`TwqTest.VM.run_m15_pressure_provider_tracker_smoke/1`. The current checked-in
+tracker baseline is:
+
+```text
+../benchmarks/baselines/m15-pressure-provider-tracker-smoke-20260417.json
+```
+
+This tracker lane still does not claim an integration surface. It validates a
+policyless transition summary above the callable session surface, keeping the
+pressure-only boundary intact while proving that the session artifact can
+support edge-count tracking without promoting queue or per-bucket semantics.
+
+The host-side tracker replay lane is also visible through
+`TwqTest.VM.run_m15_pressure_provider_tracker_replay/1`. It derives a tracker
+candidate from the checked-in session artifact and compares it against the
+checked-in tracker baseline without booting a guest.
+
+The bundle pressure-provider smoke lane is also visible through
+`TwqTest.PressureProviderBundle` and
+`TwqTest.VM.run_m15_pressure_provider_bundle_smoke/1`. The current checked-in
+bundle baseline is:
+
+```text
+../benchmarks/baselines/m15-pressure-provider-bundle-smoke-20260417.json
+```
+
+This bundle lane still does not claim an integration surface. It validates a
+callable preview that polls the session once and updates observer and tracker
+summaries from that same aggregate view, which is the shape TBBX can consume
+above the provider line without introducing TCM vocabulary below it.
+
+The host-side bundle replay lane is also visible through
+`TwqTest.VM.run_m15_pressure_provider_bundle_replay/1`. It derives a bundle
+candidate from the checked-in session artifact and compares it against the
+checked-in bundle baseline without booting a guest.
+
+The TBBX `N0` GCD-only baseline wrapper is visible through
+`TwqTest.VM.run_m15_tbbx_n0_gcd_only_baseline/1`. It reuses the checked-in
+bundle lane as condition `A.0`: GCD active, oneTBB absent, TCM absent, and no
+pressure bridge. This is a baseline artifact lane only, not a new provider
+surface.
+
+The top-level pressure-provider stack gate is also visible through
+`TwqTest.VM.run_m15_pressure_provider_stack_gate/1`. It composes the derived
+prep, live, preview, adapter, session, observer, tracker, bundle, replay, and
+contract lanes into one repo-owned readiness verdict while still staying below
+any real SPI claim.
 
 To run the real guest suites from Elixir code, use
 `TwqTest.Zig.run_hotpath_suite/1` for the raw syscall lane and
@@ -210,13 +278,55 @@ For the observer smoke lane,
 shell lane. In reuse mode it can validate the checked-in observer baseline
 against itself without booting a guest; without a candidate override it stages
 the observer probe, boots `bhyve`, extracts the observer artifact, and
-compares it against the checked-in observer baseline.
+compares it against the checked-in observer baseline. The observer artifact
+now records the callable session surface as an explicit source, not just the
+aggregate view it consumes.
+
+For the observer replay lane,
+`TwqTest.VM.run_m15_pressure_provider_observer_replay/1` wraps the repo-owned
+host-only shell lane. It derives an observer candidate from the checked-in
+session artifact and compares it against the checked-in observer baseline
+without a guest boot.
+
+For the bundle smoke lane,
+`TwqTest.VM.run_m15_pressure_provider_bundle_smoke/1` wraps the repo-owned
+shell lane. In reuse mode it can validate the checked-in bundle baseline
+against itself without booting a guest; without a candidate override it stages
+the bundle probe, boots `bhyve`, extracts the bundle artifact, and compares it
+against the checked-in bundle baseline.
+
+For the bundle replay lane,
+`TwqTest.VM.run_m15_pressure_provider_bundle_replay/1` wraps the repo-owned
+host-only shell lane. It derives a bundle candidate from the checked-in
+session artifact and compares it against the checked-in bundle baseline
+without a guest boot.
+
+For the TBBX `N0` GCD-only baseline lane,
+`TwqTest.VM.run_m15_tbbx_n0_gcd_only_baseline/1` wraps the repo-owned shell
+lane. In reuse mode it validates an existing bundle artifact, and without a
+candidate override it runs the bundle smoke lane against `dispatch.pressure`
+and `dispatch.sustained` to capture the GCD-only pressure shape.
+
+For the top-level stack gate,
+`TwqTest.VM.run_m15_pressure_provider_stack_gate/1` wraps the repo-owned shell
+lane. In its default mode it reuses the checked-in live-family baselines,
+re-derives the provider view from the checked-in crossover artifact, runs the
+observer/tracker/bundle replay lanes from the checked-in session artifact, and
+then validates the actual artifact paths used by the stack through the shared
+contract lane.
+
+For the session smoke lane,
+`TwqTest.VM.run_m15_pressure_provider_session_smoke/1` wraps the repo-owned
+shell lane. In reuse mode it can validate the checked-in session baseline
+against itself without booting a guest; without a candidate override it stages
+the session probe, boots `bhyve`, extracts the session artifact, and compares
+it against the checked-in session baseline.
 
 For the machine-readable pressure contract,
 `TwqTest.PressureProviderContract.validate/3` checks the derived, live,
-adapter, or preview artifact family against the checked-in contract file. This
-keeps the boundary self-describing without claiming that it is already a
-callable provider SPI.
+adapter, session, observer, tracker, bundle, or preview artifact family
+against the checked-in contract file. This keeps the boundary
+self-describing without claiming that it is already a callable provider SPI.
 
 The default suite covers `should-narrow`, constrained and overcommit
 `reqthreads`, `thread-enter`, `thread-return`, and `thread-transfer`.

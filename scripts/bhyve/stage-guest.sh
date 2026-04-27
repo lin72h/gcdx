@@ -21,7 +21,10 @@ Environment:
   TWQ_DISPATCH_PROBE_BIN    Userland libdispatch probe to copy
   TWQ_PRESSURE_PROVIDER_PROBE_BIN Optional live pressure-provider probe to copy
   TWQ_PRESSURE_PROVIDER_ADAPTER_PROBE_BIN Optional aggregate adapter pressure-provider probe to copy
+  TWQ_PRESSURE_PROVIDER_SESSION_PROBE_BIN Optional callable session pressure-provider probe to copy
   TWQ_PRESSURE_PROVIDER_OBSERVER_PROBE_BIN Optional observer-summary pressure-provider probe to copy
+  TWQ_PRESSURE_PROVIDER_TRACKER_PROBE_BIN Optional tracker-summary pressure-provider probe to copy
+  TWQ_PRESSURE_PROVIDER_BUNDLE_PROBE_BIN Optional bundle-summary pressure-provider probe to copy
   TWQ_PRESSURE_PROVIDER_PREVIEW_PROBE_BIN Optional raw preview pressure-provider probe to copy
   TWQ_SWIFT_ASYNC_SMOKE_BIN     Swift async smoke probe to copy
   TWQ_SWIFT_ASYNC_YIELD_BIN     Swift async yield probe to copy
@@ -82,10 +85,22 @@ Environment:
   TWQ_PRESSURE_PROVIDER_ADAPTER_INTERVAL_MS Sampling interval for the adapter pressure probe (default: 50)
   TWQ_PRESSURE_PROVIDER_ADAPTER_PRESSURE_DURATION_MS Adapter capture duration for dispatch pressure mode (default: 2500)
   TWQ_PRESSURE_PROVIDER_ADAPTER_SUSTAINED_DURATION_MS Adapter capture duration for dispatch sustained mode (default: 12000)
+  TWQ_PRESSURE_PROVIDER_SESSION_CAPTURE_MODES Optional comma-separated dispatch modes to sample callable session pressure for (`pressure`,`sustained`)
+  TWQ_PRESSURE_PROVIDER_SESSION_INTERVAL_MS Sampling interval for the session pressure probe (default: 50)
+  TWQ_PRESSURE_PROVIDER_SESSION_PRESSURE_DURATION_MS Session capture duration for dispatch pressure mode (default: 2500)
+  TWQ_PRESSURE_PROVIDER_SESSION_SUSTAINED_DURATION_MS Session capture duration for dispatch sustained mode (default: 12000)
   TWQ_PRESSURE_PROVIDER_OBSERVER_CAPTURE_MODES Optional comma-separated dispatch modes to sample observer summaries for (`pressure`,`sustained`)
   TWQ_PRESSURE_PROVIDER_OBSERVER_INTERVAL_MS Sampling interval for the observer pressure probe (default: 50)
   TWQ_PRESSURE_PROVIDER_OBSERVER_PRESSURE_DURATION_MS Observer capture duration for dispatch pressure mode (default: 2500)
   TWQ_PRESSURE_PROVIDER_OBSERVER_SUSTAINED_DURATION_MS Observer capture duration for dispatch sustained mode (default: 12000)
+  TWQ_PRESSURE_PROVIDER_TRACKER_CAPTURE_MODES Optional comma-separated dispatch modes to sample tracker summaries for (`pressure`,`sustained`)
+  TWQ_PRESSURE_PROVIDER_TRACKER_INTERVAL_MS Sampling interval for the tracker pressure probe (default: 50)
+  TWQ_PRESSURE_PROVIDER_TRACKER_PRESSURE_DURATION_MS Tracker capture duration for dispatch pressure mode (default: 2500)
+  TWQ_PRESSURE_PROVIDER_TRACKER_SUSTAINED_DURATION_MS Tracker capture duration for dispatch sustained mode (default: 12000)
+  TWQ_PRESSURE_PROVIDER_BUNDLE_CAPTURE_MODES Optional comma-separated dispatch modes to sample bundle summaries for (`pressure`,`sustained`)
+  TWQ_PRESSURE_PROVIDER_BUNDLE_INTERVAL_MS Sampling interval for the bundle pressure probe (default: 50)
+  TWQ_PRESSURE_PROVIDER_BUNDLE_PRESSURE_DURATION_MS Bundle capture duration for dispatch pressure mode (default: 2500)
+  TWQ_PRESSURE_PROVIDER_BUNDLE_SUSTAINED_DURATION_MS Bundle capture duration for dispatch sustained mode (default: 12000)
   TWQ_PRESSURE_PROVIDER_PREVIEW_CAPTURE_MODES Optional comma-separated dispatch modes to sample raw preview pressure for (`pressure`,`sustained`)
   TWQ_PRESSURE_PROVIDER_PREVIEW_INTERVAL_MS Sampling interval for the preview pressure probe (default: 50)
   TWQ_PRESSURE_PROVIDER_PREVIEW_PRESSURE_DURATION_MS Preview capture duration for dispatch pressure mode (default: 2500)
@@ -133,7 +148,10 @@ workqueue_probe_bin=${TWQ_WORKQUEUE_PROBE_BIN:-${repo_root}/../artifacts/zig/pre
 dispatch_probe_bin=${TWQ_DISPATCH_PROBE_BIN:-${repo_root}/../artifacts/zig/prefix/bin/twq-dispatch-probe}
 pressure_provider_probe_bin=${TWQ_PRESSURE_PROVIDER_PROBE_BIN:-${repo_root}/../artifacts/pressure-provider/bin/twq-pressure-provider-probe}
 pressure_provider_adapter_probe_bin=${TWQ_PRESSURE_PROVIDER_ADAPTER_PROBE_BIN:-${repo_root}/../artifacts/pressure-provider/bin/twq-pressure-provider-adapter-probe}
+pressure_provider_session_probe_bin=${TWQ_PRESSURE_PROVIDER_SESSION_PROBE_BIN:-${repo_root}/../artifacts/pressure-provider/bin/twq-pressure-provider-session-probe}
 pressure_provider_observer_probe_bin=${TWQ_PRESSURE_PROVIDER_OBSERVER_PROBE_BIN:-${repo_root}/../artifacts/pressure-provider/bin/twq-pressure-provider-observer-probe}
+pressure_provider_tracker_probe_bin=${TWQ_PRESSURE_PROVIDER_TRACKER_PROBE_BIN:-${repo_root}/../artifacts/pressure-provider/bin/twq-pressure-provider-tracker-probe}
+pressure_provider_bundle_probe_bin=${TWQ_PRESSURE_PROVIDER_BUNDLE_PROBE_BIN:-${repo_root}/../artifacts/pressure-provider/bin/twq-pressure-provider-bundle-probe}
 pressure_provider_preview_probe_bin=${TWQ_PRESSURE_PROVIDER_PREVIEW_PROBE_BIN:-${repo_root}/../artifacts/pressure-provider/bin/twq-pressure-provider-preview-probe}
 swift_async_smoke_bin=${TWQ_SWIFT_ASYNC_SMOKE_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-async-smoke}
 swift_async_yield_bin=${TWQ_SWIFT_ASYNC_YIELD_BIN:-${repo_root}/../artifacts/swift/bin/twq-swift-async-yield}
@@ -196,10 +214,22 @@ pressure_provider_adapter_capture_modes=${TWQ_PRESSURE_PROVIDER_ADAPTER_CAPTURE_
 pressure_provider_adapter_interval_ms=${TWQ_PRESSURE_PROVIDER_ADAPTER_INTERVAL_MS:-50}
 pressure_provider_adapter_pressure_duration_ms=${TWQ_PRESSURE_PROVIDER_ADAPTER_PRESSURE_DURATION_MS:-2500}
 pressure_provider_adapter_sustained_duration_ms=${TWQ_PRESSURE_PROVIDER_ADAPTER_SUSTAINED_DURATION_MS:-12000}
+pressure_provider_session_capture_modes=${TWQ_PRESSURE_PROVIDER_SESSION_CAPTURE_MODES:-}
+pressure_provider_session_interval_ms=${TWQ_PRESSURE_PROVIDER_SESSION_INTERVAL_MS:-50}
+pressure_provider_session_pressure_duration_ms=${TWQ_PRESSURE_PROVIDER_SESSION_PRESSURE_DURATION_MS:-2500}
+pressure_provider_session_sustained_duration_ms=${TWQ_PRESSURE_PROVIDER_SESSION_SUSTAINED_DURATION_MS:-12000}
 pressure_provider_observer_capture_modes=${TWQ_PRESSURE_PROVIDER_OBSERVER_CAPTURE_MODES:-}
 pressure_provider_observer_interval_ms=${TWQ_PRESSURE_PROVIDER_OBSERVER_INTERVAL_MS:-50}
 pressure_provider_observer_pressure_duration_ms=${TWQ_PRESSURE_PROVIDER_OBSERVER_PRESSURE_DURATION_MS:-2500}
 pressure_provider_observer_sustained_duration_ms=${TWQ_PRESSURE_PROVIDER_OBSERVER_SUSTAINED_DURATION_MS:-12000}
+pressure_provider_tracker_capture_modes=${TWQ_PRESSURE_PROVIDER_TRACKER_CAPTURE_MODES:-}
+pressure_provider_tracker_interval_ms=${TWQ_PRESSURE_PROVIDER_TRACKER_INTERVAL_MS:-50}
+pressure_provider_tracker_pressure_duration_ms=${TWQ_PRESSURE_PROVIDER_TRACKER_PRESSURE_DURATION_MS:-2500}
+pressure_provider_tracker_sustained_duration_ms=${TWQ_PRESSURE_PROVIDER_TRACKER_SUSTAINED_DURATION_MS:-12000}
+pressure_provider_bundle_capture_modes=${TWQ_PRESSURE_PROVIDER_BUNDLE_CAPTURE_MODES:-}
+pressure_provider_bundle_interval_ms=${TWQ_PRESSURE_PROVIDER_BUNDLE_INTERVAL_MS:-50}
+pressure_provider_bundle_pressure_duration_ms=${TWQ_PRESSURE_PROVIDER_BUNDLE_PRESSURE_DURATION_MS:-2500}
+pressure_provider_bundle_sustained_duration_ms=${TWQ_PRESSURE_PROVIDER_BUNDLE_SUSTAINED_DURATION_MS:-12000}
 pressure_provider_preview_capture_modes=${TWQ_PRESSURE_PROVIDER_PREVIEW_CAPTURE_MODES:-}
 pressure_provider_preview_interval_ms=${TWQ_PRESSURE_PROVIDER_PREVIEW_INTERVAL_MS:-50}
 pressure_provider_preview_pressure_duration_ms=${TWQ_PRESSURE_PROVIDER_PREVIEW_PRESSURE_DURATION_MS:-2500}
@@ -648,8 +678,17 @@ fi
 if [ -x "$pressure_provider_adapter_probe_bin" ]; then
   doas install -m 755 "$pressure_provider_adapter_probe_bin" "$guest_root/root/twq-pressure-provider-adapter-probe"
 fi
+if [ -x "$pressure_provider_session_probe_bin" ]; then
+  doas install -m 755 "$pressure_provider_session_probe_bin" "$guest_root/root/twq-pressure-provider-session-probe"
+fi
 if [ -x "$pressure_provider_observer_probe_bin" ]; then
   doas install -m 755 "$pressure_provider_observer_probe_bin" "$guest_root/root/twq-pressure-provider-observer-probe"
+fi
+if [ -x "$pressure_provider_tracker_probe_bin" ]; then
+  doas install -m 755 "$pressure_provider_tracker_probe_bin" "$guest_root/root/twq-pressure-provider-tracker-probe"
+fi
+if [ -x "$pressure_provider_bundle_probe_bin" ]; then
+  doas install -m 755 "$pressure_provider_bundle_probe_bin" "$guest_root/root/twq-pressure-provider-bundle-probe"
 fi
 if [ -x "$pressure_provider_preview_probe_bin" ]; then
   doas install -m 755 "$pressure_provider_preview_probe_bin" "$guest_root/root/twq-pressure-provider-preview-probe"
@@ -747,10 +786,22 @@ printf '%s\n' "$pressure_provider_adapter_capture_modes" | doas tee "$guest_root
 printf '%s\n' "$pressure_provider_adapter_interval_ms" | doas tee "$guest_root/root/twq-pressure-provider-adapter-interval-ms" >/dev/null
 printf '%s\n' "$pressure_provider_adapter_pressure_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-adapter-pressure-duration-ms" >/dev/null
 printf '%s\n' "$pressure_provider_adapter_sustained_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-adapter-sustained-duration-ms" >/dev/null
+printf '%s\n' "$pressure_provider_session_capture_modes" | doas tee "$guest_root/root/twq-pressure-provider-session-capture-modes" >/dev/null
+printf '%s\n' "$pressure_provider_session_interval_ms" | doas tee "$guest_root/root/twq-pressure-provider-session-interval-ms" >/dev/null
+printf '%s\n' "$pressure_provider_session_pressure_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-session-pressure-duration-ms" >/dev/null
+printf '%s\n' "$pressure_provider_session_sustained_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-session-sustained-duration-ms" >/dev/null
 printf '%s\n' "$pressure_provider_observer_capture_modes" | doas tee "$guest_root/root/twq-pressure-provider-observer-capture-modes" >/dev/null
 printf '%s\n' "$pressure_provider_observer_interval_ms" | doas tee "$guest_root/root/twq-pressure-provider-observer-interval-ms" >/dev/null
 printf '%s\n' "$pressure_provider_observer_pressure_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-observer-pressure-duration-ms" >/dev/null
 printf '%s\n' "$pressure_provider_observer_sustained_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-observer-sustained-duration-ms" >/dev/null
+printf '%s\n' "$pressure_provider_tracker_capture_modes" | doas tee "$guest_root/root/twq-pressure-provider-tracker-capture-modes" >/dev/null
+printf '%s\n' "$pressure_provider_tracker_interval_ms" | doas tee "$guest_root/root/twq-pressure-provider-tracker-interval-ms" >/dev/null
+printf '%s\n' "$pressure_provider_tracker_pressure_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-tracker-pressure-duration-ms" >/dev/null
+printf '%s\n' "$pressure_provider_tracker_sustained_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-tracker-sustained-duration-ms" >/dev/null
+printf '%s\n' "$pressure_provider_bundle_capture_modes" | doas tee "$guest_root/root/twq-pressure-provider-bundle-capture-modes" >/dev/null
+printf '%s\n' "$pressure_provider_bundle_interval_ms" | doas tee "$guest_root/root/twq-pressure-provider-bundle-interval-ms" >/dev/null
+printf '%s\n' "$pressure_provider_bundle_pressure_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-bundle-pressure-duration-ms" >/dev/null
+printf '%s\n' "$pressure_provider_bundle_sustained_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-bundle-sustained-duration-ms" >/dev/null
 printf '%s\n' "$pressure_provider_preview_capture_modes" | doas tee "$guest_root/root/twq-pressure-provider-preview-capture-modes" >/dev/null
 printf '%s\n' "$pressure_provider_preview_interval_ms" | doas tee "$guest_root/root/twq-pressure-provider-preview-interval-ms" >/dev/null
 printf '%s\n' "$pressure_provider_preview_pressure_duration_ms" | doas tee "$guest_root/root/twq-pressure-provider-preview-pressure-duration-ms" >/dev/null
@@ -865,6 +916,26 @@ if [ -r /root/twq-pressure-provider-adapter-sustained-duration-ms ]; then
   pressure_provider_adapter_sustained_duration_ms=$(cat /root/twq-pressure-provider-adapter-sustained-duration-ms)
 fi
 
+pressure_provider_session_capture_modes=
+if [ -r /root/twq-pressure-provider-session-capture-modes ]; then
+  pressure_provider_session_capture_modes=$(cat /root/twq-pressure-provider-session-capture-modes)
+fi
+
+pressure_provider_session_interval_ms=50
+if [ -r /root/twq-pressure-provider-session-interval-ms ]; then
+  pressure_provider_session_interval_ms=$(cat /root/twq-pressure-provider-session-interval-ms)
+fi
+
+pressure_provider_session_pressure_duration_ms=2500
+if [ -r /root/twq-pressure-provider-session-pressure-duration-ms ]; then
+  pressure_provider_session_pressure_duration_ms=$(cat /root/twq-pressure-provider-session-pressure-duration-ms)
+fi
+
+pressure_provider_session_sustained_duration_ms=12000
+if [ -r /root/twq-pressure-provider-session-sustained-duration-ms ]; then
+  pressure_provider_session_sustained_duration_ms=$(cat /root/twq-pressure-provider-session-sustained-duration-ms)
+fi
+
 pressure_provider_observer_capture_modes=
 if [ -r /root/twq-pressure-provider-observer-capture-modes ]; then
   pressure_provider_observer_capture_modes=$(cat /root/twq-pressure-provider-observer-capture-modes)
@@ -883,6 +954,46 @@ fi
 pressure_provider_observer_sustained_duration_ms=12000
 if [ -r /root/twq-pressure-provider-observer-sustained-duration-ms ]; then
   pressure_provider_observer_sustained_duration_ms=$(cat /root/twq-pressure-provider-observer-sustained-duration-ms)
+fi
+
+pressure_provider_tracker_capture_modes=
+if [ -r /root/twq-pressure-provider-tracker-capture-modes ]; then
+  pressure_provider_tracker_capture_modes=$(cat /root/twq-pressure-provider-tracker-capture-modes)
+fi
+
+pressure_provider_tracker_interval_ms=50
+if [ -r /root/twq-pressure-provider-tracker-interval-ms ]; then
+  pressure_provider_tracker_interval_ms=$(cat /root/twq-pressure-provider-tracker-interval-ms)
+fi
+
+pressure_provider_tracker_pressure_duration_ms=2500
+if [ -r /root/twq-pressure-provider-tracker-pressure-duration-ms ]; then
+  pressure_provider_tracker_pressure_duration_ms=$(cat /root/twq-pressure-provider-tracker-pressure-duration-ms)
+fi
+
+pressure_provider_tracker_sustained_duration_ms=12000
+if [ -r /root/twq-pressure-provider-tracker-sustained-duration-ms ]; then
+  pressure_provider_tracker_sustained_duration_ms=$(cat /root/twq-pressure-provider-tracker-sustained-duration-ms)
+fi
+
+pressure_provider_bundle_capture_modes=
+if [ -r /root/twq-pressure-provider-bundle-capture-modes ]; then
+  pressure_provider_bundle_capture_modes=$(cat /root/twq-pressure-provider-bundle-capture-modes)
+fi
+
+pressure_provider_bundle_interval_ms=50
+if [ -r /root/twq-pressure-provider-bundle-interval-ms ]; then
+  pressure_provider_bundle_interval_ms=$(cat /root/twq-pressure-provider-bundle-interval-ms)
+fi
+
+pressure_provider_bundle_pressure_duration_ms=2500
+if [ -r /root/twq-pressure-provider-bundle-pressure-duration-ms ]; then
+  pressure_provider_bundle_pressure_duration_ms=$(cat /root/twq-pressure-provider-bundle-pressure-duration-ms)
+fi
+
+pressure_provider_bundle_sustained_duration_ms=12000
+if [ -r /root/twq-pressure-provider-bundle-sustained-duration-ms ]; then
+  pressure_provider_bundle_sustained_duration_ms=$(cat /root/twq-pressure-provider-bundle-sustained-duration-ms)
 fi
 
 pressure_provider_preview_capture_modes=
@@ -1138,6 +1249,24 @@ pressure_provider_adapter_capture_selected()
   esac
 }
 
+pressure_provider_session_capture_selected()
+{
+  capture_mode=$1
+
+  if [ -z "${pressure_provider_session_capture_modes}" ]; then
+    return 1
+  fi
+
+  case ",${pressure_provider_session_capture_modes}," in
+    *,"${capture_mode}",*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 pressure_provider_observer_capture_selected()
 {
   capture_mode=$1
@@ -1147,6 +1276,42 @@ pressure_provider_observer_capture_selected()
   fi
 
   case ",${pressure_provider_observer_capture_modes}," in
+    *,"${capture_mode}",*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+pressure_provider_tracker_capture_selected()
+{
+  capture_mode=$1
+
+  if [ -z "${pressure_provider_tracker_capture_modes}" ]; then
+    return 1
+  fi
+
+  case ",${pressure_provider_tracker_capture_modes}," in
+    *,"${capture_mode}",*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+pressure_provider_bundle_capture_selected()
+{
+  capture_mode=$1
+
+  if [ -z "${pressure_provider_bundle_capture_modes}" ]; then
+    return 1
+  fi
+
+  case ",${pressure_provider_bundle_capture_modes}," in
     *,"${capture_mode}",*)
       return 0
       ;;
@@ -1226,6 +1391,41 @@ wait_pressure_provider_adapter_capture()
   return "${capture_rc}"
 }
 
+start_pressure_provider_session_capture()
+{
+  capture_mode=$1
+  capture_duration_ms=$2
+
+  if ! pressure_provider_session_capture_selected "${capture_mode}"; then
+    return 1
+  fi
+
+  pressure_provider_session_pid=
+  pressure_provider_session_mode=
+  echo "=== twq pressure-provider-session ${capture_mode} capture start ==="
+  /root/twq-pressure-provider-session-probe \
+    --label "dispatch.${capture_mode}" \
+    --interval-ms "${pressure_provider_session_interval_ms}" \
+    --duration-ms "${capture_duration_ms}" &
+  pressure_provider_session_pid=$!
+  pressure_provider_session_mode=${capture_mode}
+  return 0
+}
+
+wait_pressure_provider_session_capture()
+{
+  capture_rc=0
+
+  if [ -n "${pressure_provider_session_pid:-}" ]; then
+    wait "${pressure_provider_session_pid}" || capture_rc=$?
+    echo "=== twq pressure-provider-session ${pressure_provider_session_mode} capture end ==="
+    pressure_provider_session_pid=
+    pressure_provider_session_mode=
+  fi
+
+  return "${capture_rc}"
+}
+
 start_pressure_provider_observer_capture()
 {
   capture_mode=$1
@@ -1256,6 +1456,76 @@ wait_pressure_provider_observer_capture()
     echo "=== twq pressure-provider-observer ${pressure_provider_observer_mode} capture end ==="
     pressure_provider_observer_pid=
     pressure_provider_observer_mode=
+  fi
+
+  return "${capture_rc}"
+}
+
+start_pressure_provider_tracker_capture()
+{
+  capture_mode=$1
+  capture_duration_ms=$2
+
+  if ! pressure_provider_tracker_capture_selected "${capture_mode}"; then
+    return 1
+  fi
+
+  pressure_provider_tracker_pid=
+  pressure_provider_tracker_mode=
+  echo "=== twq pressure-provider-tracker ${capture_mode} capture start ==="
+  /root/twq-pressure-provider-tracker-probe \
+    --label "dispatch.${capture_mode}" \
+    --interval-ms "${pressure_provider_tracker_interval_ms}" \
+    --duration-ms "${capture_duration_ms}" &
+  pressure_provider_tracker_pid=$!
+  pressure_provider_tracker_mode=${capture_mode}
+  return 0
+}
+
+wait_pressure_provider_tracker_capture()
+{
+  capture_rc=0
+
+  if [ -n "${pressure_provider_tracker_pid:-}" ]; then
+    wait "${pressure_provider_tracker_pid}" || capture_rc=$?
+    echo "=== twq pressure-provider-tracker ${pressure_provider_tracker_mode} capture end ==="
+    pressure_provider_tracker_pid=
+    pressure_provider_tracker_mode=
+  fi
+
+  return "${capture_rc}"
+}
+
+start_pressure_provider_bundle_capture()
+{
+  capture_mode=$1
+  capture_duration_ms=$2
+
+  if ! pressure_provider_bundle_capture_selected "${capture_mode}"; then
+    return 1
+  fi
+
+  pressure_provider_bundle_pid=
+  pressure_provider_bundle_mode=
+  echo "=== twq pressure-provider-bundle ${capture_mode} capture start ==="
+  /root/twq-pressure-provider-bundle-probe \
+    --label "dispatch.${capture_mode}" \
+    --interval-ms "${pressure_provider_bundle_interval_ms}" \
+    --duration-ms "${capture_duration_ms}" &
+  pressure_provider_bundle_pid=$!
+  pressure_provider_bundle_mode=${capture_mode}
+  return 0
+}
+
+wait_pressure_provider_bundle_capture()
+{
+  capture_rc=0
+
+  if [ -n "${pressure_provider_bundle_pid:-}" ]; then
+    wait "${pressure_provider_bundle_pid}" || capture_rc=$?
+    echo "=== twq pressure-provider-bundle ${pressure_provider_bundle_mode} capture end ==="
+    pressure_provider_bundle_pid=
+    pressure_provider_bundle_mode=
   fi
 
   return "${capture_rc}"
@@ -1530,8 +1800,14 @@ log=/var/log/twq-probe.log
     pressure_provider_rc=0
     pressure_provider_adapter_started=0
     pressure_provider_adapter_rc=0
+    pressure_provider_session_started=0
+    pressure_provider_session_rc=0
     pressure_provider_observer_started=0
     pressure_provider_observer_rc=0
+    pressure_provider_tracker_started=0
+    pressure_provider_tracker_rc=0
+    pressure_provider_bundle_started=0
+    pressure_provider_bundle_rc=0
     pressure_provider_preview_started=0
     pressure_provider_preview_rc=0
     echo "=== twq dispatch pressure stats before ==="
@@ -1553,8 +1829,17 @@ log=/var/log/twq-probe.log
     if start_pressure_provider_adapter_capture "pressure" "${pressure_provider_adapter_pressure_duration_ms}"; then
       pressure_provider_adapter_started=1
     fi
+    if start_pressure_provider_session_capture "pressure" "${pressure_provider_session_pressure_duration_ms}"; then
+      pressure_provider_session_started=1
+    fi
     if start_pressure_provider_observer_capture "pressure" "${pressure_provider_observer_pressure_duration_ms}"; then
       pressure_provider_observer_started=1
+    fi
+    if start_pressure_provider_tracker_capture "pressure" "${pressure_provider_tracker_pressure_duration_ms}"; then
+      pressure_provider_tracker_started=1
+    fi
+    if start_pressure_provider_bundle_capture "pressure" "${pressure_provider_bundle_pressure_duration_ms}"; then
+      pressure_provider_bundle_started=1
     fi
     if start_pressure_provider_preview_capture "pressure" "${pressure_provider_preview_pressure_duration_ms}"; then
       pressure_provider_preview_started=1
@@ -1566,8 +1851,17 @@ log=/var/log/twq-probe.log
     if [ "${pressure_provider_adapter_started}" -ne 0 ]; then
       wait_pressure_provider_adapter_capture || pressure_provider_adapter_rc=$?
     fi
+    if [ "${pressure_provider_session_started}" -ne 0 ]; then
+      wait_pressure_provider_session_capture || pressure_provider_session_rc=$?
+    fi
     if [ "${pressure_provider_observer_started}" -ne 0 ]; then
       wait_pressure_provider_observer_capture || pressure_provider_observer_rc=$?
+    fi
+    if [ "${pressure_provider_tracker_started}" -ne 0 ]; then
+      wait_pressure_provider_tracker_capture || pressure_provider_tracker_rc=$?
+    fi
+    if [ "${pressure_provider_bundle_started}" -ne 0 ]; then
+      wait_pressure_provider_bundle_capture || pressure_provider_bundle_rc=$?
     fi
     if [ "${pressure_provider_preview_started}" -ne 0 ]; then
       wait_pressure_provider_preview_capture || pressure_provider_preview_rc=$?
@@ -1591,8 +1885,17 @@ log=/var/log/twq-probe.log
     if [ "${pressure_provider_adapter_rc}" -ne 0 ]; then
       exit "${pressure_provider_adapter_rc}"
     fi
+    if [ "${pressure_provider_session_rc}" -ne 0 ]; then
+      exit "${pressure_provider_session_rc}"
+    fi
     if [ "${pressure_provider_observer_rc}" -ne 0 ]; then
       exit "${pressure_provider_observer_rc}"
+    fi
+    if [ "${pressure_provider_tracker_rc}" -ne 0 ]; then
+      exit "${pressure_provider_tracker_rc}"
+    fi
+    if [ "${pressure_provider_bundle_rc}" -ne 0 ]; then
+      exit "${pressure_provider_bundle_rc}"
     fi
     if [ "${pressure_provider_preview_rc}" -ne 0 ]; then
       exit "${pressure_provider_preview_rc}"
@@ -1673,8 +1976,14 @@ log=/var/log/twq-probe.log
     pressure_provider_rc=0
     pressure_provider_adapter_started=0
     pressure_provider_adapter_rc=0
+    pressure_provider_session_started=0
+    pressure_provider_session_rc=0
     pressure_provider_observer_started=0
     pressure_provider_observer_rc=0
+    pressure_provider_tracker_started=0
+    pressure_provider_tracker_rc=0
+    pressure_provider_bundle_started=0
+    pressure_provider_bundle_rc=0
     pressure_provider_preview_started=0
     pressure_provider_preview_rc=0
     echo "=== twq dispatch sustained stats before ==="
@@ -1701,8 +2010,17 @@ log=/var/log/twq-probe.log
     if start_pressure_provider_adapter_capture "sustained" "${pressure_provider_adapter_sustained_duration_ms}"; then
       pressure_provider_adapter_started=1
     fi
+    if start_pressure_provider_session_capture "sustained" "${pressure_provider_session_sustained_duration_ms}"; then
+      pressure_provider_session_started=1
+    fi
     if start_pressure_provider_observer_capture "sustained" "${pressure_provider_observer_sustained_duration_ms}"; then
       pressure_provider_observer_started=1
+    fi
+    if start_pressure_provider_tracker_capture "sustained" "${pressure_provider_tracker_sustained_duration_ms}"; then
+      pressure_provider_tracker_started=1
+    fi
+    if start_pressure_provider_bundle_capture "sustained" "${pressure_provider_bundle_sustained_duration_ms}"; then
+      pressure_provider_bundle_started=1
     fi
     if start_pressure_provider_preview_capture "sustained" "${pressure_provider_preview_sustained_duration_ms}"; then
       pressure_provider_preview_started=1
@@ -1715,8 +2033,17 @@ log=/var/log/twq-probe.log
     if [ "${pressure_provider_adapter_started}" -ne 0 ]; then
       wait_pressure_provider_adapter_capture || pressure_provider_adapter_rc=$?
     fi
+    if [ "${pressure_provider_session_started}" -ne 0 ]; then
+      wait_pressure_provider_session_capture || pressure_provider_session_rc=$?
+    fi
     if [ "${pressure_provider_observer_started}" -ne 0 ]; then
       wait_pressure_provider_observer_capture || pressure_provider_observer_rc=$?
+    fi
+    if [ "${pressure_provider_tracker_started}" -ne 0 ]; then
+      wait_pressure_provider_tracker_capture || pressure_provider_tracker_rc=$?
+    fi
+    if [ "${pressure_provider_bundle_started}" -ne 0 ]; then
+      wait_pressure_provider_bundle_capture || pressure_provider_bundle_rc=$?
     fi
     if [ "${pressure_provider_preview_started}" -ne 0 ]; then
       wait_pressure_provider_preview_capture || pressure_provider_preview_rc=$?
@@ -1748,8 +2075,17 @@ log=/var/log/twq-probe.log
     if [ "${pressure_provider_adapter_rc}" -ne 0 ]; then
       exit "${pressure_provider_adapter_rc}"
     fi
+    if [ "${pressure_provider_session_rc}" -ne 0 ]; then
+      exit "${pressure_provider_session_rc}"
+    fi
     if [ "${pressure_provider_observer_rc}" -ne 0 ]; then
       exit "${pressure_provider_observer_rc}"
+    fi
+    if [ "${pressure_provider_tracker_rc}" -ne 0 ]; then
+      exit "${pressure_provider_tracker_rc}"
+    fi
+    if [ "${pressure_provider_bundle_rc}" -ne 0 ]; then
+      exit "${pressure_provider_bundle_rc}"
     fi
     if [ "${pressure_provider_preview_rc}" -ne 0 ]; then
       exit "${pressure_provider_preview_rc}"
